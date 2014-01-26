@@ -1,0 +1,30 @@
+/**
+* You can include CSS styles within your extensions as well. They'll be loaded
+* with everything else.
+*/
+
+.signature {
+  padding: 20px;
+  margin-top: 30px;
+  border-radius: 15px;
+  border: 1px solid #ddd;
+  background: rgb(250, 250, 250);
+  text-align: center;
+  cursor: pointer;
+}
+
+.signature:hover {
+  border-color: #aaa;
+  background-color: rgb(246, 246, 246);
+}
+
+.signature > p {
+  font-size:20px;
+  font-weight:bold;
+  margin: 0;
+}
+
+.signature > p.tiny {
+  color: #888;
+  font-size: 14px;
+}

@@ -1,0 +1,16 @@
+{
+  "name": "Keypress",
+  "version": "1.0.8",
+  "main": "keypress-1.0.8.min.js",
+  "description": "a robust keyboard input capturing Javascript utility focused on input for games. For details and documentation, please visit http://dmauro.github.io/Keypress/",
+  "homepage": "https://github.com/dmauro/Keypress",
+  "_release": "1.0.8",
+  "_resolution": {
+    "type": "version",
+    "tag": "1.0.8",
+    "commit": "bf614b749cf5340293e5c2b61c2afe869034e690"
+  },
+  "_source": "git://github.com/dmauro/Keypress.git",
+  "_target": "~1.0.8",
+  "_originalSource": "Keypress"
+}

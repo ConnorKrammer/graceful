@@ -1,0 +1,71 @@
+.minimap {
+  position: absolute;
+  top: 0;
+  right: 10px;
+  width: 100%;
+  height: 400%;
+  max-width: 800px;
+  padding: 4px 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: normal;
+  word-wrap: break-word;
+  -webkit-transform: scale(0.25);
+  -webkit-transform-origin: 100% 0;
+  transition: opacity 0.3s ease-in;
+  overflow: hidden;
+}
+
+.minimap-inner {
+  width: 100%;
+  margin: 0 auto;
+  padding: 4px;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  opacity: 0.2;
+}
+
+.minimap-inner > span {
+  color: #000;
+}
+
+.minimap-overlay {
+  position: absolute;
+  width: 100%;
+  height: 25%;
+  top: 0;
+  left: 0;
+  padding: 0 4px;
+  background: rgb(250, 250, 250);
+  overflow-y: hidden;
+}
+
+.minimap-overlay > pre {
+  position: relative;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  word-wrap: break-word;
+}
+
+.minimap-off .minimap {
+  opacity: 0;
+  transition-timing-function: ease-out;
+}
+
+/* Positions the editor to the left when the minimap
+ * is enabled, keeping it centered between the left of
+ * the pane and the minimap's left edge. */
+.minimap-on .CodeMirror {
+  padding-right: 160px !important; /* 800px * .20 */
+  max-width: 960px !important; /* 800px * 1.20 */
+}
+
+/* Transition the editor's position when toggling the minimap. */
+.CodeMirror {
+  transition-property: padding-right, max-width;
+  transition-timing-function: ease;
+  transition-duration: 0.5s;
+}

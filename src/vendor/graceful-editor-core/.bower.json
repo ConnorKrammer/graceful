@@ -1,0 +1,13 @@
+{
+  "name": "graceful-editor-core",
+  "homepage": "https://github.com/ConnorKrammer/graceful-editor-core",
+  "_release": "454ab5599d",
+  "_resolution": {
+    "type": "branch",
+    "branch": "master",
+    "commit": "454ab5599dc30d9f8db1090033a4be05637eff63"
+  },
+  "_source": "git://github.com/ConnorKrammer/graceful-editor-core.git",
+  "_target": "master",
+  "_originalSource": "git://github.com/ConnorKrammer/graceful-editor-core.git"
+}
