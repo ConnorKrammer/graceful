@@ -28,9 +28,6 @@
     this.userExtensions = [];
     this.coreExtensions = [];
 
-    // Check run mode by testing for the desktop shell's global variable.
-    this.mode = (typeof appshell !== 'undefined') ? 'desktop' : 'webapp';
-
     // Array of functions to call upon load.
     this.onLoadListeners = [];
     this.isLoaded = false;
@@ -39,20 +36,7 @@
     this.loader = {
       files: [],
       loadExtension: function(files) {
-        var conditionalFiles = files[self.mode];
-        var fileList = files.shared;
-
-        if (fileList && conditionalFiles) {
-          // So we can avoid all that string concatenation nonsense.
-          fileList = [].concat(fileList).concat(conditionalFiles);
-        }
-        else if (fileList || conditionalFiles) {
-          fileList = [].concat(fileList || conditionalFiles);
-        }
-        else {
-          return;
-        }
-
+        var fileList = [].concat(files);
         fileList = _.map(fileList, function(file) {
           return self.extensionDirectory + file;
         });

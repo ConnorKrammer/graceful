@@ -15,9 +15,6 @@
   graceful.coreExtensions = [
     'utils',
     'filesystem',
-    'storage',
-    'version-control',
-    'documents',
     'editor',
     'minimap'
   ];
