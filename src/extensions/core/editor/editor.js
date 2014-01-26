@@ -755,6 +755,7 @@
     if (shouldRemovePane) {
       container.removeChild(pane.wrapper);
       container.removeChild(sibling);
+      this.panes.splice(this.panes.indexOf(pane), 1);
 
       if (sibling.className.indexOf('horizontal') !== -1) {
         sizePanesEvenly(this, container, 'horizontal');
@@ -765,15 +766,12 @@
     else if (shouldRemoveParent) {
       containerParent.removeChild(container);
       containerParent.removeChild(containerSibling);
+      this.panes.splice(this.panes.indexOf(pane), 1);
+
       sizePanesEvenly(this, containerParent, 'horizontal');
     }
     else {
       pane.switchBuffer(new Buffer(''));
-    }
-
-    // Remove the editor's reference to the pane.
-    if (shouldRemovePane || shouldRemoveParent) {
-      this.panes.splice(this.panes.indexOf(pane), 1);
     }
   };
 

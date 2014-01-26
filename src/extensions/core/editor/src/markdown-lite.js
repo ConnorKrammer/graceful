@@ -120,8 +120,6 @@ CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
       styles.push("trailing-space-" + (state.trailingSpace % 2 ? "a" : "b"));
     }
 
-    console.log('hello');
-
     return styles.length ? styles.join(' ') : null;
   }
 
