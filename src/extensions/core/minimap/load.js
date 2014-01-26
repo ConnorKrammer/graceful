@@ -1,7 +1,7 @@
 'use strict';
 
 graceful.loader.loadExtension([
-  'core/minimap/shared/minimap.js',
-  'core/minimap/shared/minimap.css'
+  'core/minimap/minimap.js',
+  'core/minimap/minimap.css'
 ]);
 

@@ -44,14 +44,15 @@ CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
 
   var codeDepth = 0;
 
-  var formatting = 'formatting'
-  ,   header     = 'header'
-  ,   em         = 'em'
-  ,   strong     = 'strong';
+  var formatting    = 'formatting'
+  ,   header        = 'header'
+  ,   em            = 'em'
+  ,   strong        = 'strong'
+  ,   strikethrough = 'strikethrough';
 
   var atxHeaderRE = /^#+/
   ,   setextHeaderRE = /^(?:\={3,}|-{3,})$/
-  ,   textRE = /^[^#!\[\]*_\\<>` "'(]+/;
+  ,   textRE = /^[^#!\[\]*_\\<>` "'(~]+/;
 
   function switchInline(stream, state, f) {
     state.f = state.inline = f;
@@ -71,6 +72,8 @@ CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
     state.em = false;
     // Reset STRONG state
     state.strong = false;
+    // Reset STRIKETHROUGH state
+    state.strikethrough = false;
     // Reset state.trailingSpace
     state.trailingSpace = 0;
     state.trailingSpaceNewLine = false;
@@ -87,12 +90,12 @@ CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
       return null;
     } else if (match = stream.match(atxHeaderRE)) {
       state.header = match[0].length <= 6 ? match[0].length : 6;
-      state.formatting =  true;
+      state.formatting =  'header';
       state.f = state.inline;
       return getType(state);
     } else if (state.prevLineHasContent && (match = stream.match(setextHeaderRE))) {
       state.header = 'underline-' + (match[0].charAt(0) == '=' ? 1 : 2);
-      state.formatting = true;
+      state.formatting = 'header';
       state.f = state.inline;
       return getType(state);
     }
@@ -104,17 +107,20 @@ CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
   function getType(state) {
     var styles = [];
 
-    if (state.formatting) { styles.push(formatting); }
+    if (state.formatting) { styles.push(formatting + '-' + state.formatting); }
 
-    if (state.strong) { styles.push(strong); }
-    if (state.em) { styles.push(em); }
-    if (state.header) { styles.push(header); styles.push(header + '-' + state.header); }
+    if (state.strong)        { styles.push(strong); }
+    if (state.em)            { styles.push(em); }
+    if (state.strikethrough) { styles.push(strikethrough); }
+    if (state.header)        { styles.push(header); styles.push(header + '-' + state.header); }
 
     if (state.trailingSpaceNewLine) {
       styles.push("trailing-space-new-line");
     } else if (state.trailingSpace) {
       styles.push("trailing-space-" + (state.trailingSpace % 2 ? "a" : "b"));
     }
+
+    console.log('hello');
 
     return styles.length ? styles.join(' ') : null;
   }
@@ -149,6 +155,19 @@ CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
       return getType(state);
     }
 
+    if (ch === '~' && stream.eat('~')) {
+      if (!state.strikethrough) {
+        state.formatting = 'strikethrough';
+        state.strikethrough = true;
+        return getType(state);
+      } else {
+        state.formatting = 'strikethrough';
+        var t = getType(state);
+        state.strikethrough = false;
+        return t;
+      }
+    }
+
     var ignoreUnderscore = false;
     if (ch === '_' && stream.peek() !== '_' && stream.match(/(\w)/, false)) {
       var prevPos = stream.pos - 2;
@@ -164,22 +183,22 @@ CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
       if (sol && stream.peek() === ' ') {
         // Do nothing, surrounded by newline and space
       } else if (state.strong === ch && stream.eat(ch)) { // Remove STRONG
-        state.formatting = true;
+        state.formatting = 'strong';
         var t = getType(state);
         state.strong = false;
         return t;
       } else if (!state.strong && stream.eat(ch)) { // Add STRONG
         state.strong = ch;
-        state.formatting = true;
+        state.formatting = 'strong';
         return getType(state);
       } else if (state.em === ch) { // Remove EM
-        state.formatting = true;
+        state.formatting = 'em';
         var t = getType(state);
         state.em = false;
         return t;
       } else if (!state.em) { // Add EM
         state.em = ch;
-        state.formatting = true;
+        state.formatting = 'em';
         return getType(state);
       }
     } else if (ch === ' ') {
@@ -231,6 +250,7 @@ CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
         escape: false,
         em: false,
         strong: false,
+        strikethrough: false,
         header: 0,
         trailingSpace: 0,
         trailingSpaceNewLine: false
@@ -251,6 +271,7 @@ CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
         escape: false,
         em: s.em,
         strong: s.strong,
+        strikethrough: s.strikethrough,
         header: s.header,
         trailingSpace: s.trailingSpace,
         trailingSpaceNewLine: s.trailingSpaceNewLine,

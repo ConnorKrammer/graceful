@@ -254,7 +254,7 @@ body {
 }
 
 .link-button {
-  background: url("assets/images/link-icon.png");
+  background: url("src/assets/images/link-icon.png");
   width: 22px;
   height: 10px;
   opacity: 0.3;
@@ -319,46 +319,32 @@ body {
   display: none;
 }
 
-.cm-strong.cm-formatting,
-.cm-em.cm-formatting { 
+.cm-strikethrough {
+  background: -webkit-linear-gradient(top, 
+    rgba(255, 255, 255, 0) 0%,
+    rgba(0, 0, 0, 0) 47%,
+    rgba(0, 0, 0, 1) 48%,
+    rgba(0, 0, 0, 1) 52%,
+    rgba(0, 0, 0, 0) 53%,
+    rgba(255, 255, 255, 0) 100%);
+}
+
+.cm-formatting-strikethrough {
+  background: none;
+}
+
+.cm-formatting-strong,
+.cm-formatting-em { 
   font-weight: normal;
   font-style: normal;
-}
-
-.cm-formatting-task {
-  font-family: Consolas;
-  font-size: 0.9em;
-  font-weight: bold;
-  vertical-align: 5%;
-}
-
-.cm-comment {
-  font-family: Consolas;
-}
-
-.cm-link {
-  color: rgb(30, 30, 200);
-}
-
-.cm-formatting-link {
-  text-decoration: none;
-}
-
-.cm-string {
-  color: rgb(0, 0, 80);
 }
 
 .cm-header {
   font-weight: bold;
 }
 
-.cm-header.cm-formatting {
-  opacity: 0.1;
-}
-
 .cm-header.cm-header-underline-1,
 .cm-header.cm-header-underline-2 {
-  opacity: 1;
   font-size: 1em;
   font-weight: normal;
 }
@@ -370,16 +356,3 @@ body {
 .cm-header-4 { font-size: 1.6em; }
 .cm-header-5 { font-size: 1.4em; }
 .cm-header-6 { font-size: 1.2em; }
-
-.CodeMirror .cm-formatting-task.cm-property ~ * {
-  text-decoration: line-through;
-}
-
-.cm-strong.cm-formatting,
-.cm-em.cm-formatting,
-.CodeMirror .cm-formatting-task.cm-property ~ *,
-.cm-formatting-code,
-.cm-formatting-code-block,
-.cm-formatting-quote {
-  color: #ddd;
-}
