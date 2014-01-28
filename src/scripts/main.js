@@ -1,5 +1,7 @@
 /**
- * This file runs all final initialization for graceful.
+ * This file runs all final initialization for the graceful object. By the time
+ * this file loads, all of the core extensions have initialized, but none of the
+ * user extensions have.
  */
 
 
@@ -8,14 +10,5 @@
 
   // Set up the global graceful object.
   graceful.editor = new Editor().init();
-
-  // Execute all the graceful onLoad listeners.
-  _.forEach(graceful.onLoadListeners, function(func) {
-    func();
-  });
-
-  // Clear the listeners and set the isLoaded flag.
-  graceful.onLoadListeners = [];
-  graceful.isLoaded = true;
 }(this);
 

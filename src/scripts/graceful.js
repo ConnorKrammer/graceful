@@ -63,6 +63,19 @@
     }
   };
 
+  /**
+   * Execute all the pending onLoad listeners.
+   */
+  Graceful.prototype.loadComplete = function() {
+    _.forEach(this.onLoadListeners, function(func) {
+      func();
+    });
+
+    // Clear the listeners and set the isLoaded flag.
+    this.onLoadListeners = [];
+    this.isLoaded = true;
+  };
+
   global.Graceful = Graceful;
 }(this);
 

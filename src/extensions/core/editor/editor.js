@@ -36,13 +36,15 @@
    * @param {object} mode - The mode to use for the document.
    * @param {object} history - (optional) The document history.
    */
-  function Buffer(text, mode, history) {
+  function Buffer(text, filepath, mode, history) {
+    var _this = this;
+
     // Mix in event handling.
     Observable(this);
 
     // The master document.
-    this.rootDoc = mode ? CodeMirror.Doc(text || "", mode) 
-      : CodeMirror.Doc(text || "");
+    this.rootDoc = mode ? CodeMirror.Doc(text || '', mode) 
+      : CodeMirror.Doc(text || '');
 
     // Set the document history, if it exists.
     if (history) {
@@ -50,26 +52,70 @@
     }
 
     // Allow easy access to document text.
-    this.text = text || "";
+    this.text = text || '';
 
-    // Set the title.
+    // Set the temporary filepath.
     this.title = 'new';
+    this.filepath = null;
 
-    // Subscriber information in the form of { subscriber: object, doc: CodeMirror.Doc }.
-    this.subscribers = {};
-
-    // The last requested subscriber ID.
-    this.currentID = -1;
+    // Start with a clean state.
+    this.markClean();
 
     // Allow changes to the root document to trigger a change event.
-    var _this = this;
     this.rootDoc.on('change', _.throttle(function(doc, change) {
       _this.text = doc.getValue();
+      _this.markClean(false);
       _this.trigger('change', [_this]);
     }, 20));
 
     return this;
   }
+
+  /**
+   * Sets the buffer's filepath.
+   *
+   * Note that this doesn't strictly have to be a file *path*, but makes sense
+   * in most contexts. It can alternatively be used as a general identifier.
+   *
+   * @param {string} filename The identifier for this buffer's contents.
+   */
+  Buffer.prototype.setFilepath = function(filepath) {
+    // This gets the text after the last delimeter character and sets it as the title.
+    // If the string doesn't contain either '/' or '\', index will equal zero.
+    var index = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\')) + 1;
+    var title = filepath.substr(index);
+
+    // Set the new filename and title.
+    this.filepath = filepath;
+    this.title = title;
+
+    // Notify listeners that the filepath changed.
+    this.trigger('changeFilepath', this);
+  };
+
+  /**
+   * Sets the buffer contents. The buffer contents will also
+   * be marked as clean, unless otherwise specified.
+   *
+   * @param {string} content The new editor content.
+   * @param {boolean} isClean Whether to set the editor contents
+   *        as clean. Defaults to true.
+   */
+  Buffer.prototype.setContent = function(content, isClean) {
+    this.rootDoc.setValue(content);
+    this.markClean(isClean);
+  };
+
+  /**
+   * Mark the buffer as clean or dirty.
+   * This is useful for tracking when to save a file.
+   *
+   * @param {boolean} isClean Whether to mark the buffer as clean or not.
+   *        Defaults to clean if not specified.
+   */
+  Buffer.prototype.markClean = function(isClean) {
+    this.isClean = (isClean === false) ? false : true;
+  };
 
   /**
    * Line drawing from: http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html
@@ -342,10 +388,9 @@
     this.infoBar.className = 'infobar';
 
     // Add a title to the info bar.
-    var title = document.createElement('span');
-    title.textContent = buffer.title;
-    title.className = 'title';
-    this.infoBar.appendChild(title);
+    this.titleElement = document.createElement('span');
+    this.titleElement.className = 'title';
+    this.infoBar.appendChild(this.titleElement);
 
     // Add a status light to the info bar.
     this.statusLight = new StatusLight(this);
@@ -394,7 +439,7 @@
     var _this = this;
 
     // Set initial focus to false.
-    this.paneFocus = false;
+    this.focuses.paneFocus = false;
 
     // TODO: (FIX) Focus gets called multiple times, for some reason.
     this.wrapper.addEventListener('focus', function() {
@@ -409,9 +454,9 @@
   };
 
   Pane.prototype.updateFocusState = function() {
-    // Check for focus.
-    var focused = _.some(this.focuses, function(element) {
-      return element;
+    // Check if any focuse triggers are set to true.
+    var focused = _.some(this.focuses, function(focus) {
+      return focus;
     });
 
     // Set focus state.
@@ -439,12 +484,24 @@
    * @param {object|falsey} buffer - The new buffer.
    */
   Pane.prototype.switchBuffer = function(buffer) {
+    var _this = this;
+
     // Keep track of the old buffer.
     var oldBuffer = this.buffer;
 
     // Set the new buffer.
     this.buffer = buffer || new Buffer();
     this.trigger('changeBuffer', [buffer]);
+
+    this.titleElement.innerText = buffer.title;
+
+    // Stop tracking the old buffer's title changes.
+    if (this.titleChangeID) oldBuffer.off(this.titleChangeID);
+
+    // Track the new buffer's title.
+    this.titleChangeID = buffer.on('changeFilepath', function() {
+      _this.titleElement.innerText = buffer.title;
+    });
 
     // Return a reference to the old buffer.
     return oldBuffer;
@@ -543,11 +600,20 @@
     return Pane.call(this, buffer, wrapper, 'input');
   }
 
+  /**
+   * Sets the editor mode.
+   *
+   * @param {string|object} mode The mode for the editor.
+   */
+  InputPane.prototype.setMode = function(mode) {
+    this.editor.setOption('mode', mode);
+  };
+
   InputPane.prototype.registerFocusHandlers = function() {
     var _this = this;
     
     // Set initial focus to false.
-    this.inputFocus = false;
+    this.focuses.inputFocus = false;
 
     this.editor.on('focus', function() {
       _this.focuses.inputFocus = true;
@@ -638,6 +704,7 @@
     this.panes = [];
 
     this.commands = [];
+    this.commandHistory = [];
 
     this.container.addEventListener('keydown', function(event) {
       // Only proceed on ESC keypress.
@@ -675,7 +742,7 @@
       fencedCodeBlocks: true,
       taskLists: true
     };
-    var input   = this.addPane(InputPane, [new Buffer('', modeConfig), null], 'horizontal');
+    var input   = this.addPane(InputPane, [new Buffer('', 'new', modeConfig), null], 'horizontal');
     //var input2  = this.addPane(InputPane, [new Buffer(''), null], 'horizontal');
     //var preview = this.addPane(PreviewPane, [new Buffer(''), null, previewFunction], 'vertical', input2);
 
@@ -684,7 +751,11 @@
 
   Editor.prototype.addPane = function(constructor, args, type, parentPane) {
     var container = this.container;
-    var pane, factoryFunction, wrapper;
+    var pane, factoryFunction, wrapper, focusPane;
+
+    // Keep a reference to the focus pane, since a vertical split will
+    // de-focus it.
+    focusPane = this.getFocusPane();
 
     // The wrapper.
     args[1] = args[1] || document.createElement('div');
@@ -732,11 +803,15 @@
     this.panes.push(pane);
     sizePanesEvenly(this, container, type);
 
+    // Vertical splits cause display issues.
     if (type === 'vertical') {
       _.forEach(this.panes, function(pane) {
         pane.editor.refresh();
       });
     }
+
+    // Refocus the focus pane.
+    if (focusPane) focusPane.focus();
 
     return pane;
   };
@@ -771,7 +846,7 @@
       sizePanesEvenly(this, containerParent, 'horizontal');
     }
     else {
-      pane.switchBuffer(new Buffer(''));
+      pane.switchBuffer(new Buffer());
     }
   };
 
@@ -1010,41 +1085,43 @@
     }
   };
 
-  Editor.prototype.defineCommand = function(name, argCount, func, delimeter, forceLast) {
-    // Assign defaults.
-    delimeter = delimeter || ' ';
-    forceLast = forceLast || false;
+  function Command(name, argCount, func, delimeter, forceLast) {
+    this.name      = name;
+    this.func      = func;
+    this.argCount  = argCount;
+    this.delimeter = delimeter || ' ';
+    this.forceLast = forceLast || false;
 
-    // Define the command.
-    this.commands[name] = {
-      func: func,
-      argCount: argCount,
-      delimeter: delimeter,
-      forceLast: forceLast
-    };
+    return this;
+  }
+
+  Editor.prototype.defineCommand = function(name, argCount, func, delimeter, forceLast) {
+    this.commands[name] = new Command(name, argCount, func, delimeter, forceLast);
   };
 
-  Editor.prototype.getCommand = function(string) {
+  Editor.prototype.parseCommand = function(input) {
     var name, command, args, index, ret, error;
 
+    // If input is actually a command object.
+    if (input instanceof Command) return input;
+
     // Do nothing if the command is blank.
-    if (string.trim() === '') return;
+    if (input.trim() === '') return false;
 
     // Parse out the name;
-    name = string.split(' ', 1).toString();
+    name = input.split(' ', 1).toString();
 
-    // Throw an error for an unknown command. Will be caught by closeCommandBar().
+    // Exit if command is unknown.
     if (typeof(this.commands[name]) === 'undefined') {
-      error = new Error("Command '" + name + "' not recognized.");
-      error.commandName = name;
-      throw error;
+      console.log("Command '" + name + "' not recognized.");
+      return false;
     }
 
     // Parse out the arguments.
-    index   = string.indexOf(' ');
-    string  = index !== -1 ? string.substr(index + 1) : '';
+    index   = input.indexOf(' ');
+    input   = index !== -1 ? input.substr(index + 1) : '';
     command = this.commands[name];
-    args    = string.split(command.delimeter);
+    args    = input.split(command.delimeter);
 
     // If arguments are requested, add the remainder of the command
     // string to the final argument. If argCount < 0 then unlimited
@@ -1068,10 +1145,6 @@
     return command;
   };
 
-  Editor.prototype.runCommand = function(command) {
-    return command.func.apply(null, command.args);
-  };
-
   Editor.prototype.openCommandBar = function() {
     var pane       = this.getFocusPane();
     var commandBar = document.createElement('div');
@@ -1091,9 +1164,7 @@
     pane.focuses.commandBarFocus = true;
     pane.updateFocusState();
 
-    // Debugging.
-    //console.log('Command mode toggled on ' + pane.type || 'unknown' + ' pane.');
-
+    // Make the contentEditable div act like a resizable textarea.
     commandBar.addEventListener('keydown', function(event) {
       // Create the <br> element and get the selection and range.
       var newline   = document.createElement('br');
@@ -1130,61 +1201,72 @@
   };
 
   Editor.prototype.closeCommandBar = function() {
-    // Split up the contents of the command bar, one command per line.
-    var lines = this.commandBar.innerText.split(/\n+/);
-    var lastCommands = [];
-
-    // Outputs an error message for debugging.
-    function handleCommandError(error) {
-      console.log("%cEditor command '" 
-        + error.commandName + "' failed with error:\n%c" 
-        + error.message, "font-weight: bold;", "font-weight: normal;");
-      console.log(error.stack);
-    }
-
-    // Run each command.
-    _.forEach(lines, function(line) {
-      var command;
-      try {
-        command = this.getCommand(line);
-        if (!command) return;
-
-        if (command.forceLast) {
-          lastCommands.push(command);
-        } else {
-          this.runCommand(command);
-        }
-      } catch (error) {
-        handleCommandError(error);
-      }
-    }, this);
-
-    // Run the commands that requested last priority.
-    _.forEach(lastCommands, function(command) {
-      try {
-        this.runCommand(command);
-      } catch (error) {
-        handleCommandError(error);
-      }
-    }, this);
-
-    // Exit if the pane was removed by the command.
-    if (!this.commandBar.parentElement.parentElement) {
-      this.commandBar = null;
-      return;
-    }
+    var commandList = this.commandBar.innerText.split(/\n+/);
+    var pane        = this.getFocusPane();
 
     // Remove the command bar.
     this.commandBar.parentElement.removeChild(this.commandBar);
     this.commandBar = null;
 
-    // Remove the command bar focus state.
-    var pane = this.getFocusPane();
+    // Remove the command bar focus state and then refocus the pane.
     pane.focuses.commandBarFocus = false;
-    pane.updateFocusState();
-
-    // Return focus to the pane.
     pane.focus();
+
+    // Run all the commands.
+    this.runCommand(commandList);
+  };
+
+  /**
+   * Outputs an error message for debugging.
+   *
+   * @param {Error} error The error to use for the message.
+   * @param {Command} command The command causing the error.
+   */
+  function handleCommandError(error, command) {
+    console.log("%cEditor command '" 
+      + command.name + "' failed with error:\n%c" 
+      + error.message, "font-weight: bold;", "font-weight: normal;");
+    console.log(error.stack);
+  }
+
+  /**
+   * Run the specified command or array of commands. Commands can
+   * be passed in as either a string to be parsed (as from the
+   * command bar) or as a Command object.
+   *
+   * @param {array|string|Command} list The command(s) to run.
+   * @param {boolean} saveToHistory Whether to keep a record of the commands run.
+   */
+  Editor.prototype.runCommand = function(list, saveToHistory) {
+    // Parse out an array of commands from the list.
+    var commands = _([].concat(list))
+      .map(   function(command) { return this.parseCommand(command); }, this)
+      .filter(function(command) { return command; })
+      .sortBy(function(command) { return command.forceLast ? 1 : 0; })
+      .value();
+
+    // Create an item to track command results.
+    var historyItem = { time: new Date() };
+
+    if (saveToHistory) {
+      this.commandHistory.push(historyItem);
+    }
+      
+    // Run through the commands, waiting for promises to resolve
+    // before continuing to the next one.
+    _.reduce(commands, function(promiseChain, command, index) {
+      return Q.when(promiseChain, function() {
+        historyItem[index] = {
+          name: command.name,
+          result: 'Success'
+        };
+        return command.func.apply(null, command.args);
+      })
+      .fail(function(error) {
+        historyItem[index].result = 'Failure: ' + error.message;
+        handleCommandError(error, command);
+      });
+    }, null);
   };
 
   Editor.prototype.getFocusPane = function() {
@@ -1198,10 +1280,10 @@
   };
 
 
-  global.Buffer      = Buffer;
-  global.Pane        = Pane;
-  global.InputPane   = InputPane;
-  global.PreviewPane = PreviewPane;
-  global.Editor      = Editor;
+  global.Editor             = Editor;
+  global.Editor.Buffer      = Buffer;
+  global.Editor.Pane        = Pane;
+  global.Editor.InputPane   = InputPane;
+  global.Editor.PreviewPane = PreviewPane;
 }(this);
 

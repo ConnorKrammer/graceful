@@ -85,9 +85,13 @@
         });
       }
 
-      // Load in the user extension files.
+      // Load in the user extension files then tell graceful
+      // loading is complete.
       function loadUserExtensionFiles() {
-        yepnope(graceful.loader.files);
+        yepnope({
+          load: graceful.loader.files,
+          complete: graceful.loadComplete
+        });
       }
 
       // Start off the chain.
