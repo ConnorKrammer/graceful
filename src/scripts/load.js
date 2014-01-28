@@ -74,24 +74,32 @@
 
       // Gets all the files required by user extensions.
       function getUserExtensionFiles() {
-        // Clear the loader for the user extensions.
         graceful.loader.clear();
-
         files = getExtensionFiles(graceful.userExtensions, userDirectory);
 
-        yepnope({
-          load: files, 
-          complete: loadUserExtensionFiles
-        });
+        if (files.length) {
+          yepnope({
+            load: files, 
+            complete: loadUserExtensionFiles
+          });
+        } else {
+          loadUserExtensionFiles();
+        }
       }
 
       // Load in the user extension files then tell graceful
       // loading is complete.
       function loadUserExtensionFiles() {
-        yepnope({
-          load: graceful.loader.files,
-          complete: graceful.loadComplete
-        });
+        files = graceful.loader.files;
+
+        if (files.length) {
+          yepnope({
+            load: graceful.loader.files,
+            complete: graceful.loadComplete
+          });
+        } else {
+          graceful.loadComplete();
+        }
       }
 
       // Start off the chain.
