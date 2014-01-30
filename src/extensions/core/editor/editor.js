@@ -121,7 +121,6 @@
    * and mousemove events, and the drawing of the link line to represent this action.
    *
    * For line drawing method, see {@link http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html|here}.
-   * @todo Allow setting the color from javascript code.
    * 
    * @constructor
    * @param {Pane} pane - The pane to attach the status light to.
@@ -211,9 +210,9 @@
   function fadeIn(parentElement, element, duration, easing) {
     element.style.opacity = 0;
     element.style.transition = 'opacity ' + duration + 'ms ' + easing;
-    element.offsetHeight; // Force reflow.
     
     parentElement.appendChild(element);
+    element.offsetHeight; // Force reflow.
     element.style.opacity = 1;
 
     element.removeEventListener('transitionend', finishFadeOut);
@@ -350,26 +349,6 @@
   };
 
   /**
-   * Draws a link line between the status light and the mouse position.
-   *
-   * @param {MouseEvent} event - The mousemove event to handle.
-   */
-  StatusLight.prototype.drawLinkLine = function(event) {
-    // Get the light element's position.
-    var position = this.linkLight.getBoundingClientRect();
-
-    // Calculate the source position.
-    var originX = position.left + this.linkLight.offsetWidth  / 2 - this.linkLine.offsetWidth / 2;
-    var originY = position.top  + this.linkLight.offsetHeight / 2;
-
-    // Calculate the destination position.
-    var mouseX = this.destinationX = event.pageX - this.linkLine.offsetWidth / 2;
-    var mouseY = this.destinationY = event.pageY;
-
-    drawLine(this.linkLine, { x: originX, y: originY }, { x: mouseX, y: mouseY });
-  };
-
-  /**
    * Draws a link line between the status light and the center of the linked pane.
    *
    * Utilizees drawLine().
@@ -406,6 +385,26 @@
   StatusLight.prototype.unShowLink = function() {
     // Remove the display line.
     fadeOut(this.linkDisplayLine, 200, 'ease-in');
+  };
+
+  /**
+   * Draws a link line between the status light and the mouse position.
+   *
+   * @param {MouseEvent} event - The mousemove event to handle.
+   */
+  StatusLight.prototype.drawLinkLine = function(event) {
+    // Get the light element's position.
+    var position = this.linkLight.getBoundingClientRect();
+
+    // Calculate the source position.
+    var originX = position.left + this.linkLight.offsetWidth  / 2 - this.linkLine.offsetWidth / 2;
+    var originY = position.top  + this.linkLight.offsetHeight / 2;
+
+    // Calculate the destination position.
+    var mouseX = this.destinationX = event.pageX - this.linkLine.offsetWidth / 2;
+    var mouseY = this.destinationY = event.pageY;
+
+    drawLine(this.linkLine, { x: originX, y: originY }, { x: mouseX, y: mouseY });
   };
 
   /**
@@ -523,9 +522,12 @@
 
   /**
    * Sets the isFocused property if any of the pane's focus
-   * triggers are set.
+   * triggers are set. A focus or blur event will be dispatched
+   * if the focus state changes.
    */
   Pane.prototype.updateFocusState = function() {
+    var prevState = this.isFocused;
+
     // Check if any focuse triggers are set to true.
     var focused = _.some(this.focuses, function(focus) {
       return focus;
@@ -541,6 +543,10 @@
     else if (!focused) {
       this.wrapper.className = this.wrapper.className.replace(' focus', '');
     }
+
+    // Fire focus or blur events as appropriate.
+    if (!prevState && focused) this.trigger('focus', this);
+    else if (prevState && !focused) this.trigger('blur', this);
   };
 
   /**
@@ -557,10 +563,14 @@
    * buffer in as an argument.
    *
    * @param {Buffer} buffer - The buffer to switch to.
+   * @param {Boolean} [breakLink=false] - Whether any existing link should be broken
    * @return {Buffer} The old buffer.
    */
-  Pane.prototype.switchBuffer = function(buffer) {
+  Pane.prototype.switchBuffer = function(buffer, breakLink) {
     var _this = this;
+
+    // Break the link if requested.
+    if (breakLink && this.linkedPane) this.linkToPane(false);
 
     // Keep track of the old buffer.
     var oldBuffer = this.buffer;
@@ -592,8 +602,6 @@
    * only lights up on the pane that started the link. In other words,
    * the pane that receives the link event is the *parent* pane.)
    *
-   * @todo Contemplate this behaviour.
-   *
    * @param {Event} event - The link event.
    * @param {Pane} event.linkOrigin - The pane that requested the link.
    */
@@ -606,8 +614,6 @@
    *
    * This means that both panes will share their contents, even if one of them switches
    * to a different buffer.
-   *
-   * @todo Look into why the binding is currently two-way.
    *
    * @param {Pane} pane - The pane to link to. Passing a falsey value will remove all links.
    * @return {boolean} False if a circular reference would be created, otherwise true.
@@ -742,13 +748,14 @@
    * Overrides Pane.switchBuffer().
    *
    * @param {Buffer} buffer - The buffer to switch to.
+   * @param {Boolean} [breakLink=false] - Whether any existing link should be broken
    * @return {Buffer} The old buffer.
    */
-  InputPane.prototype.switchBuffer = function(buffer) {
+  InputPane.prototype.switchBuffer = function(buffer, breakLink) {
     this.doc = buffer.getLink();
     this.editor.swapDoc(this.doc);
     this.editor.refresh();
-    return Pane.prototype.switchBuffer.call(this, buffer);
+    return Pane.prototype.switchBuffer.call(this, buffer, breakLink);
   };
 
   // Inherit from Pane.
@@ -783,8 +790,10 @@
    * Overrides Pane.switchBuffer().
    *
    * @param {Buffer} buffer - The buffer to switch to.
+   * @param {Boolean} [breakLink=false] - Whether any existing link should be broken
+   * @return {Buffer} The old buffer.
    */
-  PreviewPane.prototype.switchBuffer = function(buffer) {
+  PreviewPane.prototype.switchBuffer = function(buffer, breakLink) {
     if (this.changeID !== undefined) {
       this.buffer.off(this.changeID);
     }
@@ -792,7 +801,7 @@
     this.changeID = buffer.on('change', this.preview.bind(this));
     this.preview(buffer);
 
-    return Pane.prototype.switchBuffer.call(this, buffer);
+    return Pane.prototype.switchBuffer.call(this, buffer, breakLink);
   };
 
   /**
@@ -1374,7 +1383,7 @@
     console.log("%cEditor command '" 
       + command.name + "' failed with error:\n%c" 
       + error.message, "font-weight: bold;", "font-weight: normal;");
-    console.log(error.stack);
+    //console.log(error.stack);
   }
 
   /**
@@ -1383,6 +1392,9 @@
    * command bar) or as an array of such strings.
    *
    * Note that if one of the commands fail, any following commands will be skipped.
+   *
+   * @todo Allow the specification of the target pane. The target pane should be
+   *       passed as the first argument to the command's function.
    *
    * @param {String|String[]} list - A command string to parse, or an array of command strings.
    * @param {boolean} [saveToHistory=false] - Whether to keep a record of the command(s) run.
@@ -1441,6 +1453,8 @@
 
   /**
    * Opens up a command bar in the currently focused pane.
+   *
+   * @todo Refactor command bar methods into a CommandBar class.
    */
   Editor.prototype.openCommandBar = function() {
     var pane       = this.getFocusPane();
@@ -1504,6 +1518,8 @@
    * @todo Fix edge case where any pane with a command bar still
    *       has the 'focus' class even if the command bar isn't
    *       focused.
+   *
+   * @todo Refactor command bar methods into a CommandBar class.
    */
   Editor.prototype.closeCommandBar = function() {
     var commandList, pane;

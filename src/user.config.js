@@ -8,6 +8,8 @@
  * the extension-boilerplate directory (found in the user extensions folder) and get coding.
  *
  * Take a look at load.js to see what's available for use in this file.
+ *
+ * @todo Move command definitions out of this file.
  */
 
 'use strict';
@@ -116,8 +118,9 @@ graceful.onLoad(function() {
 
   /**
    * Define an open command.
-   *
-   * @todo Have passing './' open the save dialogue in the file's location.
+   * 
+   * When calling this command on a pane that is linked to another pane,
+   * the link will be broken. This is due to the one-way nature of the link.
    *
    * @param {string} path The path to open. If not specified,
    *        the user will be prompted to choose a destination. If
@@ -127,8 +130,30 @@ graceful.onLoad(function() {
    * @return {promise} A promise for the open operation.
    */
   graceful.editor.defineCommand('open', 1, function(path) {
-    var focusPane = graceful.editor.getFocusPane();
-    var buffer = focusPane.buffer;
+    var focusPane  = graceful.editor.getFocusPane();
+    var buffer     = focusPane.buffer;
+    var firstChars;
+
+    // Make non-absolute filepaths relative to the buffer's filepath.
+    if (buffer.filepath) {
+      path       = path || './';
+      firstChars = path.substr(0, 3);
+
+      if (path.indexOf('/') === -1 && path.indexOf('\\') === -1) {
+        path = './' + path;
+      }
+
+      if (firstChars === '../' || firstChars === '..\\') {
+        path = './' + path;
+      }
+
+      firstChars = path.substr(0, 2);
+
+      if (firstChars === './' || firstChars === '.\\') {
+        path = buffer.filepath.substr(0, buffer.filepath.lastIndexOf(buffer.title))
+             + path.substr(2);
+      }
+    }
 
     return FileSystem.pathType(path)
       .then(function(type) {
@@ -136,8 +161,7 @@ graceful.onLoad(function() {
           // If it's an existing file, open it.
           return FileSystem.readFile(path)
             .then(function(contents) {
-              buffer.setContent(contents);
-              buffer.setFilepath(path);
+              focusPane.switchBuffer(new Editor.Buffer(contents, path), true);
             });
         }
         else if (type === 'directory') {
@@ -146,19 +170,17 @@ graceful.onLoad(function() {
             .then(function(selection) {
               return FileSystem.readFile(selection)
                 .then(function(contents) {
-                  buffer.setContent(contents);
-                  buffer.setFilepath(selection);
+                  focusPane.switchBuffer(new Editor.Buffer(contents, selection), true);
                 });
             })
         }
-        else if (!path) {
-          // If no path is specified, start the open dialogue at the last location.
+        else if (!type || !path) {
+          // If there is no path, start the open dialogue at the last used location.
           return FileSystem.showOpenDialog()
             .then(function(selection) {
               return FileSystem.readFile(selection)
                 .then(function(contents) {
-                  buffer.setContent(contents);
-                  buffer.setFilepath(selection);
+                  focusPane.switchBuffer(new Editor.Buffer(contents, selection), true);
                 });
             });
         }
@@ -167,8 +189,6 @@ graceful.onLoad(function() {
 
   /**
    * Define a save command.
-   *
-   * @todo Have passing './' open the save dialogue in the file's location.
    *
    * @param {string} path The path to save to. If not specified,
    *        the user will be prompted to choose a destination. If
@@ -183,10 +203,25 @@ graceful.onLoad(function() {
     var firstChars = path.substr(0, 2);
     var lastChar   = path.substr(-1);
 
-    // Make non-absolute filepaths relative to the open document.
-    if (buffer.filepath && (firstChars === './' || firstChars === '.\\')) {
-      path = buffer.filepath.substr(0, buffer.filepath.lastIndexOf(buffer.title))
-           + path.substr(2);
+    // Make non-absolute filepaths relative to the buffer's filepath.
+    if (buffer.filepath) {
+      path       = path || './';
+      firstChars = path.substr(0, 3);
+
+      if (path.indexOf('/') === -1 && path.indexOf('\\') === -1) {
+        path = './' + path;
+      }
+
+      if (firstChars === '../' || firstChars === '..\\') {
+        path = './' + path;
+      }
+
+      firstChars = path.substr(0, 2);
+
+      if (firstChars === './' || firstChars === '.\\') {
+        path = buffer.filepath.substr(0, buffer.filepath.lastIndexOf(buffer.title))
+             + path.substr(2);
+      }
     }
 
     return FileSystem.pathType(path)
