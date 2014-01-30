@@ -1,11 +1,17 @@
+/* This file includes the CSS styles for the graceful-minimap plugin. */
+
+/* The minimap's topmost parent object.
+ * Setting the scale factor on this resizes the whole
+ * minimap, but the height will need to be changed to compensate, 
+ * as well the height on the minimap-overlay object. */
 .minimap {
   position: absolute;
   top: 0;
   right: 10px;
   width: 100%;
-  height: 400%;
-  max-width: 800px;
-  padding: 4px 0;
+  height: 400%;     /* 100% / scale                                  */
+  max-width: 800px; /* Matches the CodeMirror max-width.             */
+  padding: 4px 0;   /* Makes the inner width the same as CodeMirror. */
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
@@ -20,7 +26,7 @@
 .minimap-inner {
   width: 100%;
   margin: 0 auto;
-  padding: 4px;
+  padding: 4px; /* Makes the inner dimensions the same as CodeMirror. */
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
@@ -34,10 +40,10 @@
 .minimap-overlay {
   position: absolute;
   width: 100%;
-  height: 25%;
+  height: 25%; /* 100% * scale */
   top: 0;
   left: 0;
-  padding: 0 4px;
+  padding: 0 4px; /* Makes the inner width the same as CodeMirror. */
   background: rgb(250, 250, 250);
   overflow-y: hidden;
 }
@@ -56,11 +62,11 @@
 }
 
 /* Positions the editor to the left when the minimap
- * is enabled, keeping it centered between the left of
- * the pane and the minimap's left edge. */
+ * is enabled, keeping it centered between the edge of
+ * the pane and the minimap. */
 .minimap-on .CodeMirror {
-  padding-right: 160px !important; /* 800px * .20 */
-  max-width: 960px !important; /* 800px * 1.20 */
+  padding-right: 200px !important; /* minimap's max-width * scale       */
+  max-width: 1000px !important;    /* minimap's max-width * (1 + scale) */
 }
 
 /* Transition the editor's position when toggling the minimap. */

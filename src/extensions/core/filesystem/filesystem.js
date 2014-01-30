@@ -6,7 +6,7 @@
  *
  * For reading and writing files, only UTF-8 is supported.
  *
- * Note the use of the javascript promise library, q, for asynchronous code.
+ * Note the use of the javascript promise library, Q, for asynchronous code.
  * See here (https://github.com/kriskowal/q) for more on understanding async promises.
  */
 
@@ -19,11 +19,10 @@
 
   /**
    * Reads a file from disk and returns a promise for its contents.
-   *
    * Only supports UTF-8 encoding.
    *
-   * @param {string} path The path on disk to read from.
-   * @return {promise} A promise returning the contents of the file.
+   * @param {string} path - The path on disk to read from.
+   * @return {promise} A promise for the contents of the file.
    */
   FileSystem.readFile = function(path) {
     var deferred = Q.defer();
@@ -41,12 +40,11 @@
 
   /**
    * Writes data to disk and returns a promise.
-   *
    * Only supports UTF-8 encoding.
    *
-   * @param {string} path The path to save to.
-   * @param {string} data The data to save.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The path to write to.
+   * @param {string} data - The data to write.
+   * @return {promise} A promise for the operation's completion.
    */
   FileSystem.writeFile = function(path, data) {
     var deferred = Q.defer();
@@ -63,13 +61,12 @@
   };
 
   /**
-   * Writes data to a file, creating any needed folders along the way, and returns a promise.
+   * Writes data to a file, recursively creating any needed folders
+   * along the way. Only supports UTF-8 encoding.
    *
-   * Only supports UTF-8 encoding.
-   *
-   * @param {string} path The path to save to.
-   * @param {string} data The data to save.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The path to write to.
+   * @param {string} data - The data to write.
+   * @return {promise} A promise for the operation's completion.
    */
   FileSystem.writeFileRecursive = function(path, data) {
     var deferred      = Q.defer();
@@ -78,8 +75,7 @@
     var directoryPath = path.substr(0, fileNameIndex - 1);
 
     if (!fileName) {
-      deferred.reject(new Error('No ' + (filename ? 'filename' : 'directory')
-            + ' specified in path.'));
+      deferred.reject(new Error('No ' + (filename ? 'filename' : 'directory') + ' specified in path.'));
       return deferred.promise;
     }
 
@@ -98,10 +94,11 @@
   };
 
   /**
-   * Creates the given directory.
+   * Creates the given directory, creating any intermediate directories
+   * as necessary.
    *
-   * @param {string} path The path to the directory.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The directory path to create.
+   * @return {promise} A promise for the operation's completion.
    */
   FileSystem.makeDirectory = function(path) {
     var deferred = Q.defer();
@@ -118,10 +115,10 @@
   }
 
   /**
-   * Checks if a file exists.
+   * Checks if a file exists at the given location.
    *
-   * @param {string} path The path of the file to check.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The path of the file to check.
+   * @return {promise} A promise for whether the file exists.
    */
   FileSystem.fileExists = function(path) {
     var deferred = Q.defer();
@@ -142,10 +139,10 @@
   };
   
   /**
-   * Checks if a directory exists.
+   * Checks if a directory exists at the given location.
    *
-   * @param {string} path The path of the directory to check.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The path of the directory to check.
+   * @return {promise} A promise for whether the directory exists.
    */
   FileSystem.directoryExists = function(path) {
     var deferred = Q.defer();
@@ -166,14 +163,13 @@
   };
 
   /**
-   * Checks if a path exists.
-   * It does this by first checking if the given path exists
-   * as a file, and if not, then by checking it it exists
-   * as a directory. If neither are true, then the path does
-   * not exist.
+   * Checks if a path exists, regardless of whether it is a file or directory.
+   * It does this by first checking if the given path exists as a file, and
+   * if not, then by checking it it exists as a directory. If neither are
+   * true, then the path does not exist.
    *
-   * @param {string} path The path to check.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The path to check.
+   * @return {promise} A promise for whether the path exists.
    */
   FileSystem.pathExists = function(path) {
     var deferred = Q.defer();
@@ -199,8 +195,8 @@
    * The promise resolves to 'file' if a file, 'directory' if a
    * directory, false if not to a real destination, or to an error.
    *
-   * @param {string} path The path to test.
-   * @return {promise} A promise for the type of path destination.
+   * @param {string} path - The path to test.
+   * @return {promise} A promise for the type of destination the path points to.
    */
   FileSystem.pathType = function(path) {
     var deferred = Q.defer();
@@ -234,8 +230,8 @@
   /**
    * Moves a file or directory to the trash folder. This allows non-permanent deletion.
    *
-   * @param {string} path The path of the file or directory to move to trash.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The path of the file or directory to move to trash.
+   * @return {promise} A promise for the operation's completion.
    */
   FileSystem.moveToTrash = function(path) {
     var deferred = Q.defer();
@@ -254,8 +250,8 @@
   /**
    * Deletes a file or directory permanently.
    *
-   * @param {string} path The path of the file or directory to delete.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The path of the file or directory to delete.
+   * @return {promise} A promise for the operation's completion.
    */
   FileSystem.unlink = function(path) {
     var deferred = Q.defer();
@@ -274,9 +270,9 @@
   /**
    * Copies a file from one location to another.
    *
-   * @param {string} source The path of the file or directory to copy.
-   * @param {string} destination The destination of the copied file.
-   * @return {promise} A promise for the operation.
+   * @param {string} source - The path of the file or directory to copy.
+   * @param {string} destination - The destination of the copied file.
+   * @return {promise} A promise for the operation's completion.
    */
   FileSystem.copyFile = function(source, destination) {
     var deferred = Q.defer();
@@ -299,9 +295,9 @@
   /**
    * Sets file permissions.
    *
-   * @param {string} path The path of the file or directory to change permissions of.
-   * @param {integer} mode The permission level to set on the file. Defaults to 0777.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The path of the file or directory to change permissions of.
+   * @param {integer} [mode=0777] - The permission level to set on the file, in base 8.
+   * @return {promise} A promise for the operation's completion.
    */
   FileSystem.chmod = function(path, mode) {
     var deferred = Q.defer();
@@ -321,8 +317,8 @@
   /**
    * Renames a file or directory.
    *
-   * @param {string} path The path to change.
-   * @return {promise} A promise for the operation.
+   * @param {string} path - The path of the file or directory to rename.
+   * @return {promise} A promise for the operation's completion.
    */
   FileSystem.rename = function(path, newPath) {
     var deferred = Q.defer();
@@ -342,16 +338,15 @@
    * Shows the default open file dialogue and prompts the user to select
    * a file. The promise resolves to the selected filepath.
    *
-   * @param {string} title The title to show on the open dialogue. Defaults
-   *        to 'Open file'.
+   * @param {string} [title='Open file'] - The title of the dialogue's window.
    *
-   * @param {string} initialPath The starting path to open the dialogue to.
+   * @param {string} [initialPath] - The starting path to open the dialogue to.
    *        Setting this to null or '' will open the last chosen path.
    *
-   * @param {array||string} fileTypes An array of file types to restrict
+   * @param {array|string} [fileTypes] - An array of file types to restrict
    *        the display to. When specifying these, do not include the '.'
    *        character. For example, if you only want to display .js files,
-   *        either 'js' or ['js'].
+   *        pass either 'js' or ['js'].
    *
    * @return {promise} A promise for the user selection.
    */
@@ -380,14 +375,13 @@
    * Shows the default save file dialogue and prompts the user to select
    * a location. The promise resolves to the selected filepath.
    *
-   * @param {string} title The title to show on the open dialogue. Defaults
-   *        to 'Save file'.
+   * @param {string} [title='Save file'] - The title of the dialogue's window.
    *
-   * @param {string} initialPath The starting path to open the dialogue to.
+   * @param {string} [initialPath] - The starting path to open the dialogue to.
    *        Setting this to null or '' will open the last chosen path.
    *
-   * @param {string} filename The initial name to set for the new file. This
-   *        can be changed by the user in the dialogue.
+   * @param {string} [filename] - The initial name to set for the new file. This
+   *        can be changed by the user in the dialogue window.
    *
    * @return {promise} A promise for the saved file's path.
    */

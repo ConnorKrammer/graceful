@@ -30,7 +30,7 @@ graceful.onLoad(function() {
   /**
    * Link the current pane to the specified pane. (Determined by index.)
    *
-   * TODO: Allow a more intuitive way to specify the linked pane.
+   * @todo Allow a more intuitive way to specify the linked pane.
    *
    * @param {integer) paneNumber The index of the pane in the graceful.editor.panes
    *        array to create the link with.
@@ -99,7 +99,7 @@ graceful.onLoad(function() {
    * Completely shuts down the application.
    * If the debug window is open, it will be closed as well.
    *
-   * TODO: Prompt user to save changes before closing.
+   * @todo Prompt user to save changes before closing.
    */
   graceful.editor.defineCommand('quit', 0, function() {
     appshell.app.closeLiveBrowser();
@@ -116,6 +116,8 @@ graceful.onLoad(function() {
 
   /**
    * Define an open command.
+   *
+   * @todo Have passing './' open the save dialogue in the file's location.
    *
    * @param {string} path The path to open. If not specified,
    *        the user will be prompted to choose a destination. If
@@ -165,6 +167,8 @@ graceful.onLoad(function() {
 
   /**
    * Define a save command.
+   *
+   * @todo Have passing './' open the save dialogue in the file's location.
    *
    * @param {string} path The path to save to. If not specified,
    *        the user will be prompted to choose a destination. If
@@ -241,3 +245,4 @@ graceful.onLoad(function() {
       });
   });
 });
+

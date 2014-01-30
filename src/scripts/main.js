@@ -4,11 +4,10 @@
  * user extensions have.
  */
 
-
 !function(global) {
   'use strict';
 
   // Set up the global graceful object.
-  graceful.editor = new Editor().init();
+  graceful.editor = new Editor();
+  graceful.editor.init();
 }(this);
-

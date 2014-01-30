@@ -13,9 +13,9 @@
   function Utils() {}
 
   /**
-   * Maps application shell errors codes to more descriptive error messages.
+   * Maps appshell errors codes to more descriptive error messages.
    *
-   * @param {integer} The error code returned.
+   * @param {integer} errorCode - The error code returned.
    * @return {string} A message describing the error code.
    */
   Utils.getShellErrorMessage = function(errorCode) {

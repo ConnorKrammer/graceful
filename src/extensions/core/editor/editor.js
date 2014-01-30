@@ -1,29 +1,16 @@
 /**
- * graceful-editor-core is a text editor with parser and multi-edit functionality. It
- * supplies the core editor abilities to the graceful editor project (wait, how'd you guess?),
- * but, is designed to be modular and usable in any project. Its current implementation
- * utilizes the marked markdown parser to produce HTML, but any other input/output pair can also
- * be generated. All you need to do is pass the Editor() function a configuration object with
- * a parse property of the form function(input, options), and graceful-editor-core will do the
- * rest for you. You can even extend an existing parser's functionality by adding pre- and post-parse
- * functions to the parsing pipeline. Feel free to fork the project and build something of your own with
- * it!
+ * graceful-editor
  *
- * Dependencies: Lo-Dash:         lodash.com/docs
- *               jQuery:          http://api.jquery.com/
- *               observable:      https://github.com/js-coder/observable
+ * Defines the Editor class, as well as several namespaced classes (Editor.Buffer, Editor.Pane,
+ * Editor.InputPane, etc.) that relate to text editing functionality.
  *
- * Developed by Connor Krammer:
- *   (https://www.github.com/ConnorKrammer/graceful-editor-core)
+ * Dependencies: Lo-Dash:    lodash.com/docs
+ *               observable: https://github.com/js-coder/observable
  */
 
 
 !function(global) {
   'use strict';
-
-  /* ============================
-   * The Buffer class.
-   * ============================ */
 
   /**
    * The Buffer class.
@@ -32,9 +19,10 @@
    * and syncing updates across all subscribing panes.
    *
    * @constructor
-   * @param {string} text - The text to begin the document with.
-   * @param {object} mode - The mode to use for the document.
-   * @param {object} history - (optional) The document history.
+   * @param {String} [text=''] - The text to begin the document with.
+   * @param {String} [filepath=null] - The filepath to associate the buffer with.
+   * @param {object|string} [mode] - The CodeMirror mode to use for the document.
+   * @param {Object} [history] - Any edit history to attach to the buffer.
    */
   function Buffer(text, filepath, mode, history) {
     var _this = this;
@@ -42,21 +30,22 @@
     // Mix in event handling.
     Observable(this);
 
+    // Set default and allow easy access to document text.
+    this.text = text = text || '';
+
     // The master document.
-    this.rootDoc = mode ? CodeMirror.Doc(text || '', mode) 
-      : CodeMirror.Doc(text || '');
+    this.rootDoc = mode ? CodeMirror.Doc(text, mode) : CodeMirror.Doc(text);
 
-    // Set the document history, if it exists.
-    if (history) {
-      this.rootDoc.setHistory(history);
+    // Set the document history, if specified.
+    if (history) this.rootDoc.setHistory(history);
+
+    // Set the initial filepath.
+    if (!filepath) {
+      this.title = 'new';
+      this.filepath = null;
+    } else {
+      this.setFilepath(filepath);
     }
-
-    // Allow easy access to document text.
-    this.text = text || '';
-
-    // Set the temporary filepath.
-    this.title = 'new';
-    this.filepath = null;
 
     // Start with a clean state.
     this.markClean();
@@ -74,18 +63,19 @@
   /**
    * Sets the buffer's filepath.
    *
-   * Note that this doesn't strictly have to be a file *path*, but makes sense
-   * in most contexts. It can alternatively be used as a general identifier.
+   * This will also update the buffer's title to whatever text comes after
+   * the last directory delimeter character {'/' or '\').
    *
-   * @param {string} filename The identifier for this buffer's contents.
+   * @param {String} filepath - The filepath to associate with the buffer.
    */
   Buffer.prototype.setFilepath = function(filepath) {
     // This gets the text after the last delimeter character and sets it as the title.
-    // If the string doesn't contain either '/' or '\', index will equal zero.
+    // If the string doesn't contain either '/' or '\', index will equal zero, and
+    // title will equal the whole string.
     var index = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\')) + 1;
     var title = filepath.substr(index);
 
-    // Set the new filename and title.
+    // Set the new filepath and title.
     this.filepath = filepath;
     this.title = title;
 
@@ -97,9 +87,8 @@
    * Sets the buffer contents. The buffer contents will also
    * be marked as clean, unless otherwise specified.
    *
-   * @param {string} content The new editor content.
-   * @param {boolean} isClean Whether to set the editor contents
-   *        as clean. Defaults to true.
+   * @param {String} content - The new editor content.
+   * @param {boolean} [isClean] - Whether to set the editor contents as clean.
    */
   Buffer.prototype.setContent = function(content, isClean) {
     this.rootDoc.setValue(content);
@@ -110,20 +99,38 @@
    * Mark the buffer as clean or dirty.
    * This is useful for tracking when to save a file.
    *
-   * @param {boolean} isClean Whether to mark the buffer as clean or not.
-   *        Defaults to clean if not specified.
+   * @param {boolean} [isClean=true] Whether to mark the buffer as clean or not.
    */
   Buffer.prototype.markClean = function(isClean) {
     this.isClean = (isClean === false) ? false : true;
   };
 
   /**
-   * Line drawing from: http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html
+   * Returns a linked CodeMirror document.
+   *
+   * @return {CodeMirror.Doc} The linked document.
    */
-  function StatusLight(pane, color) {
-    var _this = this;
+  Buffer.prototype.getLink = function() {
+    return this.rootDoc.linkedDoc({ sharedHist: true });
+  };
 
-    // Keep a reference to the parent pane.
+  /**
+   * The StatusLight class.
+   *
+   * Manages the visual aspects of linking two panes, namely the handlers on the click
+   * and mousemove events, and the drawing of the link line to represent this action.
+   *
+   * For line drawing method, see {@link http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html|here}.
+   * @todo Allow setting the color from javascript code.
+   * 
+   * @constructor
+   * @param {Pane} pane - The pane to attach the status light to.
+   */
+  function StatusLight(pane) {
+    var _this = this;
+    var timer;
+
+    // Keep a reference to the pane.
     this.pane = pane;
 
     // Event handlers.
@@ -132,7 +139,7 @@
     this.endLinkClickHandler = this.endLink.bind(this);
     this.endLinkKeyHandler = function(event) {
       if (event.keyCode === 27) {
-        _this.resetLink();
+        _this.endLink(false);
       }
     };
     this.transitionEndHandler = function(event) {
@@ -141,8 +148,6 @@
       this.style.opacity    = '';
       document.body.removeChild(this);
     };
-
-    var timer;
     this.showLinkHoverHandler = function(event) {
       timer = window.setTimeout(_this.showLink.bind(_this), 150, event);
     }
@@ -193,34 +198,49 @@
     return this;
   }
 
-  function finishFadeIn(event) {
-    this.style.opacity = '';
-    this.style.transition = '';
-    this.removeEventListener('transitionend', finishFadeIn);
-  }
-
-  function finishFadeOut(event) {
-    this.style.opacity = '';
-    this.style.transition = '';
-    this.parentNode.removeChild(this);
-    this.removeEventListener('transitionend', finishFadeOut);
-  }
-
+  /**
+   * Adds an element to another element and fades it in from transparent.
+   * The fade will be for the given duration, and with the specified easing
+   * function. Note that the easing function must be CSS-compliant.
+   *
+   * @param {Element} parentElement - The element to add the transitioned element to.
+   * @param {Element} element - The element to fade in.
+   * @param {number} duration - The duration, in milliseconds, of the fade.
+   * @param {String} easing - The easing function to use for the transition.
+   */
   function fadeIn(parentElement, element, duration, easing) {
     element.style.opacity = 0;
     element.style.transition = 'opacity ' + duration + 'ms ' + easing;
+    element.offsetHeight; // Force reflow.
     
     parentElement.appendChild(element);
-
-    // Allow the transition to take before animating.
-    window.setTimeout(function() {
-      element.style.opacity = 1;
-    }, 0);
+    element.style.opacity = 1;
 
     element.removeEventListener('transitionend', finishFadeOut);
     element.addEventListener('transitionend', finishFadeIn);
   }
 
+  /**
+   * Completes the fade-in effect started by fadeIn().
+   *
+   * @param {TransitionEvent} event - The transitionend event to handle.
+   */
+  function finishFadeIn(event) {
+    var target = event.target;
+
+    target.style.opacity = '';
+    target.style.transition = '';
+    target.removeEventListener('transitionend', finishFadeIn);
+  }
+
+  /**
+   * Fades an element out for the given duration, with the specified
+   * easing. Note that the easing function must be CSS-compliant.
+   *
+   * @param {Element} element - The element to fade out.
+   * @param {number} duration - The duration, in milliseconds, of the fade.
+   * @param {String} easing - The easing function to use for the transition.
+   */
   function fadeOut(element, duration, easing) {
     element.style.opacity = 0;
     element.style.transition = 'opacity ' + duration + 'ms ' + easing;
@@ -229,8 +249,133 @@
     element.addEventListener('transitionend', finishFadeOut);
   }
 
-  StatusLight.prototype.showLink = function(event) {
-    // Add the line.
+  /**
+   * Completes the fade-out effect started by fadeOut(), and removes
+   * the element.
+   *
+   * @param {TransitionEvent} event - The transitionend event to handle.
+   */
+  function finishFadeOut(event) {
+    var target = event.target;
+
+    target.style.opacity = '';
+    target.style.transition = '';
+    target.parentNode.removeChild(target);
+    target.removeEventListener('transitionend', finishFadeOut);
+  }
+
+  /**
+   * Resizes and rotates an element so that it stretches between the specified points.
+   *
+   * @param {Element} line - The element to use.
+   *
+   * @param {Object} origin - The start point of the line in screen coordinates.
+   * @param {number} origin.x - The x position of the origin.
+   * @param {number} origin.y - The y position of the origin.
+   *
+   * @param {Object} destination - The end point of the line in screen coordinates.
+   * @param {number} destination.x - The x position of the destination.
+   * @param {number} destination.y - The y position of the destination.
+   */
+  function drawLine(line, origin, destination) {
+    // Get the length of the line.
+    var length = Math.sqrt((destination.x - origin.x) * (destination.x - origin.x) +
+                           (destination.y - origin.y) * (destination.y - origin.y));
+
+    // Calculate the angle.
+    var angle = 180 / 3.1415 * Math.acos((destination.y - origin.y) / length);
+    if (destination.x > origin.x) angle *= -1;
+
+    // Draw the line from the source to the destination.
+    line.style.height = length - 8 + 'px';
+    line.style.top    = origin.y + 'px';
+    line.style.left   = origin.x + 'px';
+    line.style.webkitTransform = 'rotate(' + angle + 'deg)';
+  }
+
+  /**
+   * Starts the link process by adding a line element and attaching event listeners.
+   *
+   * @param {MouseEvent} event - The click event to handle.
+   */
+  StatusLight.prototype.startLink = function(event) {
+    // Prevent this click from bubbling up to the document where it would trigger
+    // the handler immediately. This also allows chaining of several pane's
+    // links (since a click on another status light won't trigger the end click
+    // handler), which was unexpected but not unwelcome.
+    event.stopPropagation();
+
+    // Add the link line and add event listeners.
+    document.body.appendChild(this.linkLine);
+    document.addEventListener('mousemove', this.drawLinkLineMoveHandler);
+    document.addEventListener('click', this.endLinkClickHandler);
+    document.addEventListener('keydown', this.endLinkKeyHandler);
+
+    // Remove the start listener.
+    this.linkLight.removeEventListener('click', this.startLinkClickHandler);
+  };
+
+  /**
+   * Resets the link process and links the panes based upon the mouse position.
+   *
+   * @param {boolean} [makeLink=true] - Whether to link the panes, if possible.
+   */
+  StatusLight.prototype.endLink = function(makeLink) {
+    makeLink = makeLink || (typeof makeLink === 'undefined') ? true : false;
+
+    // Reset the link line's state.
+    this.linkLine.style.transition = 'height 0.3s ease, opacity 0.2s ease';
+    this.linkLine.style.height     = '0px';
+    this.linkLine.style.opacity    = 0;
+    this.linkLine.addEventListener('transitionend', this.transitionEndHandler);
+
+    // Remove event listeners.
+    document.removeEventListener('mousemove', this.drawLinkLineMoveHandler);
+    document.removeEventListener('click', this.endLinkClickHandler);
+    document.removeEventListener('keydown', this.endLinkKeyHandler);
+
+    // Add the start listener again.
+    this.linkLight.addEventListener('click', this.startLinkClickHandler);
+
+    // If noLink is true, don't link the panes.
+    if (makeLink) {
+      // Get the element under the mouse when the link ended.
+      var linkDestination = document.elementFromPoint(this.destinationX, this.destinationY);
+
+      // Dispatch a link event.
+      var linkEvent = new Event('link', { bubbles: true });
+      linkEvent.linkOrigin = this.pane;
+      linkDestination.dispatchEvent(linkEvent);
+    }
+  };
+
+  /**
+   * Draws a link line between the status light and the mouse position.
+   *
+   * @param {MouseEvent} event - The mousemove event to handle.
+   */
+  StatusLight.prototype.drawLinkLine = function(event) {
+    // Get the light element's position.
+    var position = this.linkLight.getBoundingClientRect();
+
+    // Calculate the source position.
+    var originX = position.left + this.linkLight.offsetWidth  / 2 - this.linkLine.offsetWidth / 2;
+    var originY = position.top  + this.linkLight.offsetHeight / 2;
+
+    // Calculate the destination position.
+    var mouseX = this.destinationX = event.pageX - this.linkLine.offsetWidth / 2;
+    var mouseY = this.destinationY = event.pageY;
+
+    drawLine(this.linkLine, { x: originX, y: originY }, { x: mouseX, y: mouseY });
+  };
+
+  /**
+   * Draws a link line between the status light and the center of the linked pane.
+   *
+   * Utilizees drawLine().
+   */
+  StatusLight.prototype.showLink = function() {
+    // Add the link line to the document body.
     // This is done first so that offsetWidth can be accessed.
     fadeIn(document.body, this.linkDisplayLine, 200, 'ease-in');
 
@@ -255,111 +400,32 @@
     drawLine(this.linkDisplayLine, origin, destination);
   };
 
+  /**
+   * Fades out the link line added in showLink().
+   */
   StatusLight.prototype.unShowLink = function() {
     // Remove the display line.
     fadeOut(this.linkDisplayLine, 200, 'ease-in');
   };
 
-  StatusLight.prototype.startLink = function(event) {
-    // Prevent this click from bubbling up to the document where it would trigger
-    // the handler immediately. This also allows chaining of several pane's
-    // links (since a click on another status light won't trigger the end click
-    // handler), which was unexpected but not unwelcome.
-    event.stopPropagation();
-
-    // Add the link line and add event listeners.
-    document.body.appendChild(this.linkLine);
-    document.addEventListener('mousemove', this.drawLinkLineMoveHandler);
-    document.addEventListener('click', this.endLinkClickHandler);
-    document.addEventListener('keydown', this.endLinkKeyHandler);
-
-    this.linkLight.removeEventListener('click', this.startLinkClickHandler);
-
-    document.body.className += ' link-in-progress';
-  };
-
-  function drawLine(line, origin, destination) {
-    // Get the length of the line.
-    var length = Math.sqrt((destination.x - origin.x) * (destination.x - origin.x) +
-                           (destination.y - origin.y) * (destination.y - origin.y));
-
-    // Calculate the angle.
-    var angle = 180 / 3.1415 * Math.acos((destination.y - origin.y) / length);
-    if (destination.x > origin.x) angle *= -1;
-
-    // Draw the line from the source to the destination.
-    line.style.height = length - 8 + 'px';
-    line.style.top    = origin.y + 'px';
-    line.style.left   = origin.x + 'px';
-    line.style.webkitTransform = 'rotate(' + angle + 'deg)';
-  }
-
-  StatusLight.prototype.drawLinkLine = function(event) {
-    // Get the light element's position.
-    var position = this.linkLight.getBoundingClientRect();
-
-    // Calculate the source position.
-    var originX = position.left + this.linkLight.offsetWidth  / 2 - this.linkLine.offsetWidth / 2;
-    var originY = position.top  + this.linkLight.offsetHeight / 2;
-
-    // Calculate the destination position.
-    var mouseX = this.destinationX = event.pageX - this.linkLine.offsetWidth / 2;
-    var mouseY = this.destinationY = event.pageY;
-
-    drawLine(this.linkLine, { x: originX, y: originY }, { x: mouseX, y: mouseY });
-  };
-
-  StatusLight.prototype.endLink = function(noLink) {
-    this.resetLink();
-
-    // Get the element under the mouse when the link ended.
-    var linkDestination = document.elementFromPoint(this.destinationX, this.destinationY);
-
-    // Dispatch a link event.
-    var linkEvent = new Event('link', { bubbles: true });
-    linkEvent.linkOrigin = this.pane;
-    linkDestination.dispatchEvent(linkEvent);
-  };
-
-  StatusLight.prototype.resetLink = function() {
-    this.linkLine.style.transition = 'height 0.3s ease, opacity 0.2s ease';
-    this.linkLine.style.height     = '0px';
-    this.linkLine.style.opacity    = 0;
-    this.linkLine.addEventListener('transitionend', this.transitionEndHandler);
-
-    // Remove event listeners.
-    document.removeEventListener('mousemove', this.drawLinkLineMoveHandler);
-    document.removeEventListener('click', this.endLinkClickHandler);
-    document.removeEventListener('keydown', this.endLinkKeyHandler);
-
-    this.linkLight.addEventListener('click', this.startLinkClickHandler);
-
-    document.body.className = document.body.className.replace(' link-in-progress', '');
-  };
-
-  /**
-   * Assigns an object a linked copy of the root document.
-   *
-   * @return {CodeMirror.Doc} The linked document.
-   */
-  Buffer.prototype.getLink = function() {
-    return this.rootDoc.linkedDoc({ sharedHist: true });
-  };
-
-  /* ============================
-   * The base Pane class.
-   * ============================ */
-
   /**
    * The Pane base class.
    *
-   * Panes are responsible for managing a Buffer objects in various ways.
-   * Note that the wrapper argument is not actually utlized by this base class,
-   * but is in every subclass.
+   * Panes are responsible for managing Buffer objects in various ways and displaying
+   * them to the user.
+   *
+   * Note that all pane subclasses must take the buffer as the first argument and the
+   * wrapper as the second in order to be usable by Editor.addPane(). Type should not
+   * be publically set in the constructor.
+   *
+   * @todo Find a better way of setting the type property. Currently it is passed as
+   *       an argument to the constructor, but that doesn't work for subclasses of
+   *       subclasses, where that argument is omitted.
    *
    * @constructor
-   * @param {object|falsey} buffer - The buffer to start with.
-   * @param {element} wrapper - The parent element of this pane.
+   * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
+   * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
+   * @param {String} [type='base'] - The type of pane. Parameter only used by subclasses.
    */
   function Pane(buffer, wrapper, type) {
     var _this = this;
@@ -426,14 +492,17 @@
     return this;
   }
 
-  Pane.prototype.postInitialize = function() {
-
-  };
+  /**
+   * A method meant to be overridden by subclasses.
+   * Called after the Pane object has been completely initialized.
+   */
+  Pane.prototype.postInitialize = function() {};
 
   /**
    * Responsible for registering focus and blur handlers.
+   * Meant to be overridden by subclasses.
    *
-   * Only called once, on pane creation.
+   * @todo Figure out why the wrapper's focus event gets called multiple times.
    */
   Pane.prototype.registerFocusHandlers = function() {
     var _this = this;
@@ -441,7 +510,6 @@
     // Set initial focus to false.
     this.focuses.paneFocus = false;
 
-    // TODO: (FIX) Focus gets called multiple times, for some reason.
     this.wrapper.addEventListener('focus', function() {
       _this.focuses.paneFocus = true;
       _this.updateFocusState();
@@ -453,6 +521,10 @@
     });
   };
 
+  /**
+   * Sets the isFocused property if any of the pane's focus
+   * triggers are set.
+   */
   Pane.prototype.updateFocusState = function() {
     // Check if any focuse triggers are set to true.
     var focused = _.some(this.focuses, function(focus) {
@@ -471,6 +543,9 @@
     }
   };
 
+  /**
+   * On overrideable method to set focus on the pane.
+   */
   Pane.prototype.focus = function() {
     this.wrapper.focus();
   };
@@ -479,9 +554,10 @@
    * Switches the active buffer.
    *
    * This will trigger the changeBuffer event, passing the new
-   * buffers in as an argument.
+   * buffer in as an argument.
    *
-   * @param {object|falsey} buffer - The new buffer.
+   * @param {Buffer} buffer - The buffer to switch to.
+   * @return {Buffer} The old buffer.
    */
   Pane.prototype.switchBuffer = function(buffer) {
     var _this = this;
@@ -490,7 +566,7 @@
     var oldBuffer = this.buffer;
 
     // Set the new buffer.
-    this.buffer = buffer || new Buffer();
+    this.buffer = buffer;
     this.trigger('changeBuffer', [buffer]);
 
     this.titleElement.innerText = buffer.title;
@@ -507,17 +583,33 @@
     return oldBuffer;
   };
 
+  /**
+   * Handles the link event.
+   *
+   * Note that the call to linkToPane() is on event.linkOrigin, not
+   * this pane, because direction matters in a link. (Mostly for when
+   * it's broken, and because the link icon on the pane's title bar
+   * only lights up on the pane that started the link. In other words,
+   * the pane that receives the link event is the *parent* pane.)
+   *
+   * @todo Contemplate this behaviour.
+   *
+   * @param {Event} event - The link event.
+   * @param {Pane} event.linkOrigin - The pane that requested the link.
+   */
   Pane.prototype.linkHandler = function(event) {
     event.linkOrigin.linkToPane(this);
   };
 
   /**
-   * Keeps buffers synchronized with another pane.
+   * Keeps two panes synchronized.
    *
-   * This means it will always preview the linked pane's buffer contents,
-   * even if the other pane's buffer is changed.
+   * This means that both panes will share their contents, even if one of them switches
+   * to a different buffer.
    *
-   * @param {object} pane - The pane to link to. Passing a falsey value will remove all links.
+   * @todo Look into why the binding is currently two-way.
+   *
+   * @param {Pane} pane - The pane to link to. Passing a falsey value will remove all links.
    * @return {boolean} False if a circular reference would be created, otherwise true.
    */
   Pane.prototype.linkToPane = function(pane) {
@@ -531,15 +623,15 @@
       }
     }
 
-    // This pane shouldn't be cycle-able.
-    this.isAnchored = true;
-
     // Remove event handlers from old linked pane.
     if (this.linkedPane) {
       this.linkedPane.off(this.linkID);
     }
 
     if (pane) {
+      // This pane shouldn't be cycle-able.
+      this.isAnchored = true;
+
       // Switch to the new buffer.
       this.switchBuffer(pane.buffer);
 
@@ -554,6 +646,9 @@
         this.wrapper.className += ' has-link';
       }
     } else {
+      // Make the pane cycleable again.
+      this.isAnchored = true;
+
       // Switch to a new buffer.
       this.switchBuffer(new Buffer());
 
@@ -567,24 +662,22 @@
     return true;
   };
 
-
-  /* ============================
-   * The InputPane class.
-   * ============================ */
-
   // Inherit from Pane.
   InputPane.prototype = new Pane();
   InputPane.prototype.constructor = Pane;
 
   /**
-   * Input panes are used to manipulate buffer contents.
+   * The InputPane class.
    *
-   * Utilizes a CodeMirror instance.
+   * Input panes allow the user to type into a buffer.
+   *
+   * For a description of valid values for the editorConfig parameter,
+   * see {@link http://codemirror.net//doc/manual.html#config|here}.
    *
    * @constructor
-   * @param {object|falsey} buffer - The buffer to start with.
-   * @param {element} wrapper - The parent element of the input pane.
-   * @param {object} editorConfig - (optional) A configuration object to pass to the CodeMirror constructor.
+   * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
+   * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
+   * @param {Object} [editorConfig] - A configuration object to pass to the CodeMirror constructor.
    */
   function InputPane(buffer, wrapper, editorConfig) {
     // Merge in defaults with the supplied configuration.
@@ -592,6 +685,9 @@
       lineWrapping: true,
       undoDepth: 1000
     }, editorConfig);
+
+    // For CodeMirror, even though Pane() handles this later.
+    wrapper = wrapper || document.createElement('div');
     
     // Create the editor.
     this.editor = CodeMirror(wrapper, editorConfig);
@@ -601,14 +697,20 @@
   }
 
   /**
-   * Sets the editor mode.
+   * Sets the editor's mode.
    *
-   * @param {string|object} mode The mode for the editor.
+   * For a description of valid values for the mode parameter,
+   * see {@link http://codemirror.net//doc/manual.html#option_mode|here}.
+   *
+   * @param {String|Object} mode The mode for the editor.
    */
   InputPane.prototype.setMode = function(mode) {
     this.editor.setOption('mode', mode);
   };
 
+  /**
+   * Overrides Pane.registerFocusHandlers().
+   */
   InputPane.prototype.registerFocusHandlers = function() {
     var _this = this;
     
@@ -628,36 +730,40 @@
     Pane.prototype.registerFocusHandlers.call(this);
   };
 
+  /**
+   * Overrides Pane.focus().
+   */
   InputPane.prototype.focus = function() {
     this.editor.focus();
   };
 
   /**
-   * Switch the active buffer.
+   * Switches the active buffer.
+   * Overrides Pane.switchBuffer().
    *
-   * @param {object} buffer The buffer to switch to.
+   * @param {Buffer} buffer - The buffer to switch to.
+   * @return {Buffer} The old buffer.
    */
   InputPane.prototype.switchBuffer = function(buffer) {
     this.doc = buffer.getLink();
     this.editor.swapDoc(this.doc);
+    this.editor.refresh();
     return Pane.prototype.switchBuffer.call(this, buffer);
   };
-
-  /* ============================
-   * The PreviewPane class.
-   * ============================ */
 
   // Inherit from Pane.
   PreviewPane.prototype = new Pane();
   PreviewPane.prototype.constructor = Pane;
 
   /**
+   * The PreviewPane class.
+   *
    * Preview panes are used to parse and display buffer contents.
    *
    * @constructor
-   * @param {object|falsey} buffer - The buffer to start with.
-   * @param {element} wrapper - The parent element of the input pane.
-   * @param {function} parse - The parsing function, which takes a string and returns it parsed.
+   * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
+   * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
+   * @param {Function} [parse] - The parsing function, which accepts a string as input and returns it parsed.
    */
   function PreviewPane(buffer, wrapper, parse) {
     // The preview function.
@@ -674,8 +780,9 @@
 
   /**
    * Switch the active buffer.
+   * Overrides Pane.switchBuffer().
    *
-   * @param {object} buffer The buffer to switch to.
+   * @param {Buffer} buffer - The buffer to switch to.
    */
   PreviewPane.prototype.switchBuffer = function(buffer) {
     if (this.changeID !== undefined) {
@@ -691,21 +798,34 @@
   /**
    * Parses buffer contents and displays them.
    *
-   * @param {object} buffer The buffer to preview.
+   * @param {Buffer} buffer - The buffer to preview.
    */
   PreviewPane.prototype.preview = function(buffer) {
     this.previewArea.innerHTML = this.parse(buffer.text);
   };
 
+  /**
+   * The Editor class.
+   *
+   * The Editor class is responsible for managing Pane objects and presenting
+   * a display to the user. It also has methods for running user-defineable commands
+   * that can extend functionality further.
+   *
+   * @constructor
+   * @param {String} containerID - The id of the element to insert the editor into.
+   */
   function Editor(containerID) {
     var _this = this;
 
+    // Get the container and start with 
     this.container = document.getElementById('editor');
     this.panes = [];
 
+    // Command-related properties.
     this.commands = [];
     this.commandHistory = [];
 
+    // Toggle the command bar with ESC.
     this.container.addEventListener('keydown', function(event) {
       // Only proceed on ESC keypress.
       if (event.keyCode !== 27) return;
@@ -721,7 +841,14 @@
     return this;
   }
 
+  /**
+   * Outdated function that is currently being used for setup.
+   *
+   * @todo Get rid of this.
+   */
   Editor.prototype.init = function() {
+    /*
+    // Parsing function for a preview pane.
     var previewFunction = function(text) {
       return marked(text, {
         gfm: true,
@@ -734,32 +861,49 @@
         langPrefix: 'lang-'
       });
     };
+    */
 
-    // Setup some test panes.
+    // Test pane mode configuration.
     var modeConfig = {
       name: 'markdown-lite',
       highlightFormatting: true,
       fencedCodeBlocks: true,
       taskLists: true
     };
-    var input   = this.addPane(InputPane, [new Buffer('', 'new', modeConfig), null], 'horizontal');
-    //var input2  = this.addPane(InputPane, [new Buffer(''), null], 'horizontal');
-    //var preview = this.addPane(PreviewPane, [new Buffer(''), null, previewFunction], 'vertical', input2);
 
-    return this;
+    // Add the test pane.
+    var input = this.addPane(InputPane, [new Buffer('', null, modeConfig)], 'horizontal');
+
+    /*
+    var input2  = this.addPane(InputPane, [new Buffer('')], 'horizontal');
+    var preview = this.addPane(PreviewPane, [new Buffer(''), null, previewFunction], 'vertical', input2);
+    */
   };
 
+  /**
+   * Adds a new pane. If the type is set to 'vertical', then the pane will be
+   * inserted into the same vertical compartment as parentPane.
+   *
+   * @todo Add the new pane immediately after the parent pane.
+   * @todo Contemplate whether or not to emulate vim's behaviour, in that a pane
+   *       taking up approximately > 80% of the screen's width/height will be
+   *       partitioned in half without effecting any other panes.
+   *
+   * @param {Function} constructor - The constructor of the pane type to add.
+   * @param {Array} args - An array of arguments, to be passed in order to the constructor.
+   * @param {String} type - The orientation of the pane. Passing 'vertical' will
+   *        create the split vertically, while 'horizontal' splits it in the horizontal
+   *        direction.
+   */
   Editor.prototype.addPane = function(constructor, args, type, parentPane) {
     var container = this.container;
     var pane, factoryFunction, wrapper, focusPane;
 
-    // Keep a reference to the focus pane, since a vertical split will
-    // de-focus it.
+    // Keep a reference to the focus pane, since a vertical split could de-focus it.
     focusPane = this.getFocusPane();
 
-    // The wrapper.
-    args[1] = args[1] || document.createElement('div');
-    wrapper = args[1];
+    // The wrapper is needed before the pane is created, so get a smart default.
+    wrapper = args[1] = args[1] || document.createElement('div');
 
     if (type === 'vertical' && parentPane) {
       if (parentPane.wrapper.parentNode.className.match('vertical-splitter-pane')) {
@@ -783,6 +927,7 @@
     }
 
     // Don't allow too many panes.
+    // The addition is to account for splitters.
     if ((type === 'vertical' && container.children.length >= 5 + 4) ||
         (type === 'horizontal' && container.children.length >= 3 + 2)) {
       return false;
@@ -816,13 +961,20 @@
     return pane;
   };
 
+  /**
+   * Remove the specified pane.
+   *
+   * @param {Pane} pane - The pane to remove.
+   */
   Editor.prototype.removePane = function(pane) {
     var container        = pane.wrapper.parentElement;
     var sibling          = pane.wrapper.previousElementSibling || pane.wrapper.nextElementSibling;
     var containerParent  = container.parentElement;
     var containerSibling = container.previousElementSibling || container.nextElementSibling;
 
-    var shouldRemovePane   = sibling && sibling.className.indexOf('splitter') !== -1;
+    // Separate cases are needed for cases including vertical splitters.
+    // For example, removing the last pane in a vertical split should also remove the split.
+    var shouldRemovePane = sibling && sibling.className.indexOf('splitter') !== -1;
     var shouldRemoveParent = !sibling && containerSibling
       && container.className.indexOf('vertical-splitter-pane') !== -1
       && containerSibling.className.indexOf('splitter') !== -1;
@@ -850,6 +1002,13 @@
     }
   };
 
+  /**
+   * Divides up the space evenly among panes in the given direction.
+   *
+   * @param {Editor} editor - The editor to resize panes from.
+   * @param {Element} container - The element containing the panes.
+   * @param {String} direction - The direction to resize the panes in.
+   */
   function sizePanesEvenly(editor, container, direction) {
     var children = container.children;
     var paneCount = (children.length + 1) / 2;
@@ -867,6 +1026,7 @@
       }
     }
 
+    // Trigger a resize event.
     _.forEach(editor.panes, function(pane) {
       pane.trigger('resize');
     });
@@ -882,6 +1042,25 @@
     });
   }
 
+  /**
+   * Inserts a splitter into a container.
+   * Splitters are used to resize panes.
+   *
+   * @todo Refactor this into its own class. Right now it's over
+   *       200 lines of code long, and the separate drag handlers
+   *       could probably be combined (each being 50 lines by
+   *       themselves).
+   * @todo Add an argument specifying after which child the splitter
+   *       should be added.
+   * @todo Factor out the drag detection into a utility class so that
+   *       it can be used elsewhere without code duplication.
+   * @todo Move the constant terms used to calculate the minimum width
+   *       and height into a public property on the editor object (since
+   *       it is also used to calculate the maximum number of panes).
+   *
+   * @param {Element} container - The element to insert the splitter into.
+   * @param {String} type - The direction the splitter should move in.
+   */
   Editor.prototype.addSplitter = function(container, type) {
     var splitter = document.createElement('div');
     var isDrag   = false;
@@ -937,7 +1116,7 @@
         prev.style.width = ((prevWidth / parentWidth) * 100) + '%';
         next.style.width = ((nextWidth / parentWidth) * 100) + '%';
 
-        // Trigger resize events.
+        // Trigger resize events on the affected panes.
         _.forEach(resizePanes, function(pane) {
           pane.trigger('resize');
         });
@@ -992,7 +1171,7 @@
         prev.style.height = ((prevHeight / parentHeight) * 100) + '%';
         next.style.height = ((nextHeight / parentHeight) * 100) + '%';
 
-        // Trigger resize events.
+        // Trigger resize events on the affected panes.
         _.forEach(resizePanes, function(pane) {
           pane.trigger('resize');
         });
@@ -1074,17 +1253,37 @@
     });
   };
 
+  /**
+   * Cycles the pane's buffers in order without changing the panes'
+   * positions. Skips over panes that are anchored in place.
+   *
+   * @todo Sort panes in a logical (probably physical) order, not
+   *       by order added.
+   */
   Editor.prototype.cyclePaneBuffers = function() {
     var panes  = _.filter(this.panes, { 'isAnchored': false });
     var length = panes.length;
     var temp   = panes[0].switchBuffer(panes[length - 1].buffer);
 
-    // TODO: Sort panes by physical order, not order added.
     for (var i = 1; i < length; i++) {
       temp = panes[i].switchBuffer(temp);
     }
   };
 
+  /**
+   * The Command class.
+   *
+   * Commands define a function and a method for parsing arguments
+   * out of a string to be passed to that function.
+   *
+   * @constructor
+   * @param {String} name - The name of the command.
+   * @param {Integer} argCount - The number of arguments the command function accepts.
+   * @param {Function} func - The function the command invokes.
+   * @param {String} delimeter - The delimeter between function arguments.
+   * @param {Boolean} forceLast - Whether the command should be pushed to the end
+   *        of the call list when several commands are run sequentially.
+   */
   function Command(name, argCount, func, delimeter, forceLast) {
     this.name      = name;
     this.func      = func;
@@ -1095,15 +1294,39 @@
     return this;
   }
 
+  /**
+   * Defines a command. The parameters are just passed on to the Command constructor.
+   *
+   * @param {String} name - The name of the command.
+   * @param {Integer} argCount - The number of arguments the command function accepts.
+   * @param {Function} func - The function the command invokes.
+   * @param {String} delimeter - The delimeter between function arguments.
+   * @param {Boolean} forceLast - Whether the command should be pushed to the end
+   *        of the call list when several commands are run sequentially.
+   */
   Editor.prototype.defineCommand = function(name, argCount, func, delimeter, forceLast) {
     this.commands[name] = new Command(name, argCount, func, delimeter, forceLast);
   };
 
+  /**
+   * Function that throws an error for an unrecognized command.
+   */
+  function failCommand() {
+    throw new Error('Command not recognized.'); 
+  }
+
+  /**
+   * Parses the name and arguments for a command out of a string and
+   * fetches the command from the editor's command hash.
+   *
+   * @param {String} input - The input command string.
+   * @return {Array|false} An array with a Command instance in the first
+   *         index, and an array of arguments to pass to the command
+   *         in the second. A special command is returned if the input
+   *         is unrecognized, and false is returned on blank input.
+   */
   Editor.prototype.parseCommand = function(input) {
     var name, command, args, index, ret, error;
-
-    // If input is actually a command object.
-    if (input instanceof Command) return input;
 
     // Do nothing if the command is blank.
     if (input.trim() === '') return false;
@@ -1111,10 +1334,9 @@
     // Parse out the name;
     name = input.split(' ', 1).toString();
 
-    // Exit if command is unknown.
-    if (typeof(this.commands[name]) === 'undefined') {
-      console.log("Command '" + name + "' not recognized.");
-      return false;
+    // Return a failing command if command is unknown.
+    if (typeof this.commands[name] === 'undefined') {
+      return [new Command(name, 0, failCommand), null];
     }
 
     // Parse out the arguments.
@@ -1138,13 +1360,88 @@
       args = ret;
     }
 
-    // Set the args.
-    command.args = args;
-
     // Return the command.
-    return command;
+    return [command, args];
   };
 
+  /**
+   * Outputs an error message for debugging.
+   *
+   * @param {Error} error - The error to use for the message.
+   * @param {Command} command - The command causing the error.
+   */
+  function handleCommandError(error, command) {
+    console.log("%cEditor command '" 
+      + command.name + "' failed with error:\n%c" 
+      + error.message, "font-weight: bold;", "font-weight: normal;");
+    console.log(error.stack);
+  }
+
+  /**
+   * Run the specified command or array of commands. Commands can
+   * be passed in as either a string to be parsed (as from the
+   * command bar) or as an array of such strings.
+   *
+   * Note that if one of the commands fail, any following commands will be skipped.
+   *
+   * @param {String|String[]} list - A command string to parse, or an array of command strings.
+   * @param {boolean} [saveToHistory=false] - Whether to keep a record of the command(s) run.
+   */
+  Editor.prototype.runCommand = function(list, saveToHistory) {
+    // Parse out an array of commands from the list.
+    var commands = _([].concat(list))
+      .map(   function(string)  { return this.parseCommand(string); }, this)
+      .filter(function(results) { return typeof results[0] !== 'undefined'; })
+      .sortBy(function(results) { return results[0].forceLast ? 1 : 0; })
+      .value();
+
+    // Create an item to track command results.
+    var historyItem = { time: new Date() };
+
+    // Setting this to true within the _.reduce() call will skip remaining commands.
+    var failHard = false;
+
+    // Save a record of the commands if requested.
+    if (saveToHistory || false) this.commandHistory.push(historyItem);
+      
+    // Run through the commands in order.
+    _.reduce(commands, function(promiseChain, commandInfo, index) {
+      var command = commandInfo[0];
+      var args = commandInfo[1];
+
+      // Wait for any returned promises to resolve before continuing.
+      return Q.when(promiseChain, function() {
+        historyItem[index] = {
+          name: command.name,
+          result: 'Succeeded'
+        };
+
+        // There was an error: skip remaining commands.
+        if (failHard) throw new Error();
+
+        return command.func.apply(null, args);
+      })
+      .fail(function(error) {
+        if (command.func === failCommand) {
+          historyItem[index].result = 'Unrecognized';
+        }
+        else if (failHard) {
+          historyItem[index].result = 'Skipped';
+        }
+        else {
+          historyItem[index].result = 'Failed: ' + error.message;
+          handleCommandError(error, command);
+        }
+
+        // Skip remaining commands.
+        failHard = true;
+      });
+    }, null);
+  };
+
+  /**
+   * Opens up a command bar in the currently focused pane.
+   */
   Editor.prototype.openCommandBar = function() {
     var pane       = this.getFocusPane();
     var commandBar = document.createElement('div');
@@ -1198,88 +1495,60 @@
 
     // Keep a reference to the command bar.
     this.commandBar = commandBar;
+    this.commandPane = pane;
   };
 
+  /**
+   * Closes the open command bar.
+   *
+   * @todo Fix edge case where any pane with a command bar still
+   *       has the 'focus' class even if the command bar isn't
+   *       focused.
+   */
   Editor.prototype.closeCommandBar = function() {
-    var commandList = this.commandBar.innerText.split(/\n+/);
-    var pane        = this.getFocusPane();
+    var commandList, pane;
+
+    // Exit if the command bar is not open.
+    if (!this.commandBar) return;
+
+    // Get the command bar text, and the focused pane.
+    commandList = this.commandBar.innerText.split(/\n+/);
 
     // Remove the command bar.
     this.commandBar.parentElement.removeChild(this.commandBar);
     this.commandBar = null;
 
     // Remove the command bar focus state and then refocus the pane.
-    pane.focuses.commandBarFocus = false;
-    pane.focus();
+    this.commandPane.focuses.commandBarFocus = false;
+    this.commandPane.focus();
 
     // Run all the commands.
-    this.runCommand(commandList);
+    this.runCommand(commandList, true);
   };
 
   /**
-   * Outputs an error message for debugging.
+   * Returns the focused pane.
    *
-   * @param {Error} error The error to use for the message.
-   * @param {Command} command The command causing the error.
+   * @return {Pane|false} The focused pane, or false if no pane has focus.
    */
-  function handleCommandError(error, command) {
-    console.log("%cEditor command '" 
-      + command.name + "' failed with error:\n%c" 
-      + error.message, "font-weight: bold;", "font-weight: normal;");
-    console.log(error.stack);
-  }
-
-  /**
-   * Run the specified command or array of commands. Commands can
-   * be passed in as either a string to be parsed (as from the
-   * command bar) or as a Command object.
-   *
-   * @param {array|string|Command} list The command(s) to run.
-   * @param {boolean} saveToHistory Whether to keep a record of the commands run.
-   */
-  Editor.prototype.runCommand = function(list, saveToHistory) {
-    // Parse out an array of commands from the list.
-    var commands = _([].concat(list))
-      .map(   function(command) { return this.parseCommand(command); }, this)
-      .filter(function(command) { return command; })
-      .sortBy(function(command) { return command.forceLast ? 1 : 0; })
-      .value();
-
-    // Create an item to track command results.
-    var historyItem = { time: new Date() };
-
-    if (saveToHistory) {
-      this.commandHistory.push(historyItem);
-    }
-      
-    // Run through the commands, waiting for promises to resolve
-    // before continuing to the next one.
-    _.reduce(commands, function(promiseChain, command, index) {
-      return Q.when(promiseChain, function() {
-        historyItem[index] = {
-          name: command.name,
-          result: 'Success'
-        };
-        return command.func.apply(null, command.args);
-      })
-      .fail(function(error) {
-        historyItem[index].result = 'Failure: ' + error.message;
-        handleCommandError(error, command);
-      });
-    }, null);
-  };
-
   Editor.prototype.getFocusPane = function() {
-    return _.find(this.panes, 'isFocused');
+    return _.find(this.panes, 'isFocused') || false;
   };
 
+  /**
+   * Returns the pane with the specified element as a wrapper.
+   *
+   * @param {Element} element - The wrapper element to find the pane of.
+   * @return {Pane|false} The pane with the given wrapper, or false if no
+   *         pane has the wrapper specified.
+   */
   Editor.prototype.getPaneByElement = function(element) {
     return _.find(this.panes, function(pane) {
       return pane.wrapper === element;
-    });
+    }) || false;
   };
 
-
+  // Expose globals.
   global.Editor             = Editor;
   global.Editor.Buffer      = Buffer;
   global.Editor.Pane        = Pane;

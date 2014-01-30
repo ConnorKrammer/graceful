@@ -1,3 +1,15 @@
+/**
+ * markdown-lite
+ *
+ * This is a pared-down version of CodeMirror's default markdown mode implementation.
+ * It supports headers, bold, italic, and strikethrough by default.
+ * Other markdown features are left as plaintext.
+ *
+ * Formatting characters are marked with their own class, and CodeMirror's
+ * default naming scheme for headers has been changed to include a hyphen
+ * between the word 'header' and the header level number.
+ */
+
 CodeMirror.defineMode("markdown-lite", function(cmCfg, modeCfg) {
 
   var htmlFound = CodeMirror.modes.hasOwnProperty("xml");

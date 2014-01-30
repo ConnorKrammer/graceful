@@ -1,5 +1,8 @@
 /*
- * Defines a command that displays a minimap for the current pane.
+ * graceful-minimap
+ *
+ * Defines a command for the editor that displays a minimap for the current pane.
+ * Depends on the graceful-editor core extension.
  */
 
 !function(global) {
@@ -9,11 +12,10 @@
    * MiniMap constructor.
    *
    * Creates a minimap that displays the editor content and can be used
-   * to scroll.
+   * as a draggable scrollbar.
    *
    * @constructor
-   *
-   * @param {InputPane} pane The pane to add the minimap to.
+   * @param {InputPane} pane - The pane to add the minimap to.
    * @return {MiniMap} The created minimap.
    */
   function MiniMap(pane) {
@@ -138,9 +140,9 @@
   };
 
   /**
-   * Detects a drag event and moves the minimap accordingly.
+   * Detects a drag and moves the minimap accordingly.
    *
-   * @param {Event} event A mousemove event.
+   * @param {Event} event - A mousemove event.
    */
   MiniMap.prototype.dragHandler = function(event) {
     var currentTop, nextTop, scrollInfo, height, clientHeight, scrollPercent, scrollPosition;
@@ -182,7 +184,7 @@
   /**
    * Scrolls the editor and the minimap to the given position.
    *
-   * @param {number} scrollTop The position to scroll the top of the editor to.
+   * @param {number} scrollTop - The position to scroll the top of the editor to.
    */
   MiniMap.prototype.scrollToPosition = function(scrollTop) {
     var scrollInfo   = this.cm.getScrollInfo();
@@ -216,7 +218,7 @@
 
   /**
    * Updates the area of the minimap that contains the editor
-   * viewport content (what is currently seen on screen).
+   * viewport text (what is currently seen on screen).
    */
   MiniMap.prototype.updateContent = function() {
     // Get the text and calculate its offset.
@@ -235,12 +237,13 @@
   };
 
   /**
-   * Show the full content of the editor in the minimap.
+   * Shows the full content of the editor in the minimap.
    * This is more expensive than updating the overlay, so it uses
    * a custom replaceHTML function and is called less frequently.
+   * It also doesn't utilize CodeMirror's mode capabilities.
    *
    * Note that an empty space is appended to the text if the last line
-   * is empty, so that it renders properly.
+   * is empty, otherwise the last line will not display.
    */
   MiniMap.prototype.updateInnerContent = function() {
     var text = this.cm.doc.getValue();
@@ -250,13 +253,10 @@
   };
 
   /**
-   * Update the position of the editor so that it remains centered between
-   * the edge of the pane and the edge of the minimap. If the pane is too
-   * narrow to fit both, then the minimap is hidden with a transition controlled by CSS.
-   *
-   * Note that the method of determining the pane's width is to find the percent width of
-   * the pane and calculate the pixel width based on that. This is to avoid mistakes
-   * during width transitions on the pane.
+   * Toggles the minimap based on whether it fits into the pane with the editor.
+   * That the method of determining the pane's width is to find the percent width of
+   * the pane and calculate the pixel width based on that. This is to avoid calculation
+   * errors from ocurring in cases where a transition is in progress.
    */
   MiniMap.prototype.updateDisplay = function() {
     var wrapper         = this.pane.wrapper;
@@ -286,12 +286,11 @@
   };
 
   /**
-   * Replace an element's HTML contents.
-   *
+   * Replaces an element's HTML contents.
    * @see http://blog.stevenlevithan.com/archives/faster-than-innerhtml
    *
-   * @param {Element} element The element to alter.
-   * @param {string}  html    The new element contents.
+   * @param {Element} element - The element to alter.
+   * @param {string} html - The new element contents.
    * @return {Element} The replaced element.
    */
   function replaceHTML(el, html) {
@@ -309,10 +308,11 @@
    * Sets a transition property on an element, then removes that transition
    * after it finishes.
    *
-   * @param {Element} element    The element to operate on.
-   * @param {string}  property   The property to transition.
-   * @param {string}  transition The transition to run.
-   * @param {string|value} afterValue An optional value to set on transition end.
+   * @param {Element} element - The element to operate on.
+   * @param {string} property - The property to transition.
+   * @param {string} transition - The transition to run.
+   * @param {string|value} afterValue - An optional value to set the property to
+   *        after the transition is complete.
    */
   function toggleTransition(element, property, transition, afterValue) {
     function transitionEnd(event) {
@@ -330,8 +330,11 @@
     element.addEventListener('transitionend', transitionEnd);
   }
 
-  // When graceful is loaded, define minimap command.
-  // It gives other commands priority.
+  /**
+   * When graceful is loaded, define the 'mini' command to
+   * create a minimap on the current pane.
+   * The command gives other commands priority.
+   */
   graceful.onLoad(function() {
     graceful.editor.defineCommand('mini', 0, function() {
       var pane = graceful.editor.getFocusPane();
@@ -339,3 +342,4 @@
     }, null, true);
   });
 }(this);
+
