@@ -537,12 +537,7 @@
     this.isFocused = focused;
 
     // Toggle the focus class as necessary.
-    if (focused && this.wrapper.className.indexOf(' focus') === -1) {
-      this.wrapper.className += ' focus';
-    }
-    else if (!focused) {
-      this.wrapper.className = this.wrapper.className.replace(' focus', '');
-    }
+    this.wrapper.classList.toggle('focus', focused);
 
     // Fire focus or blur events as appropriate.
     if (!prevState && focused) this.trigger('focus', this);
@@ -646,21 +641,16 @@
       this.linkID = pane.on('changeBuffer', function(newBuffer) {
         _this.switchBuffer(newBuffer);
       });
-
-      // Add a class to both pane's wrappers.
-      if (this.wrapper.className.indexOf('has-link') === -1) {
-        this.wrapper.className += ' has-link';
-      }
     } else {
       // Make the pane cycleable again.
       this.isAnchored = true;
 
       // Switch to a new buffer.
       this.switchBuffer(new Buffer());
-
-      // Remove the link class.
-      this.wrapper.className = this.wrapper.className.replace(' has-link', '');
     }
+
+    // Toggle the link based on whether the pane exists.
+    this.wrapper.classList.toggle('has-link', pane);
 
     // Set the new link pane.
     this.linkedPane = pane;
@@ -915,7 +905,7 @@
     wrapper = args[1] = args[1] || document.createElement('div');
 
     if (type === 'vertical' && parentPane) {
-      if (parentPane.wrapper.parentNode.className.match('vertical-splitter-pane')) {
+      if (parentPane.wrapper.parentNode.classList.contains('vertical-splitter-pane')) {
         // Grab the existing split container.
         container = parentPane.wrapper.parentNode;
       } else {
@@ -983,17 +973,17 @@
 
     // Separate cases are needed for cases including vertical splitters.
     // For example, removing the last pane in a vertical split should also remove the split.
-    var shouldRemovePane = sibling && sibling.className.indexOf('splitter') !== -1;
+    var shouldRemovePane = sibling && sibling.classList.contains('splitter');
     var shouldRemoveParent = !sibling && containerSibling
-      && container.className.indexOf('vertical-splitter-pane') !== -1
-      && containerSibling.className.indexOf('splitter') !== -1;
+      && container.classList.contains('vertical-splitter-pane')
+      && containerSibling.classList.contains('splitter');
 
     if (shouldRemovePane) {
       container.removeChild(pane.wrapper);
       container.removeChild(sibling);
       this.panes.splice(this.panes.indexOf(pane), 1);
 
-      if (sibling.className.indexOf('horizontal') !== -1) {
+      if (sibling.classList.contains('horizontal')) {
         sizePanesEvenly(this, container, 'horizontal');
       } else {
         sizePanesEvenly(this, container, 'vertical');
@@ -1213,14 +1203,14 @@
       resizePanes = [];
 
       // Get the pane, or its sub-panes if applicable.
-      if (prev.className.indexOf('splitter-pane') !== -1) {
+      if (prev.classList.contains('splitter-pane')) {
         children = children.concat(Array.prototype.slice.call(prev.children));
       } else {
         children.push(prev);
       }
 
       // Get the pane, or its sub-panes if applicable.
-      if (next.className.indexOf('splitter-pane') !== -1) {
+      if (next.classList.contains('splitter-pane')) {
         children = children.concat(Array.prototype.slice.call(next.children));
       } else {
         children.push(next);
@@ -1228,7 +1218,7 @@
 
       // Filter out any splitters.
       children = _.filter(children, function(child) {
-        return child.className.indexOf('splitter') === -1;
+        return child.classList.contains('splitter');
       });
 
       // Store the panes for later.
@@ -1237,8 +1227,8 @@
       });
 
       // Disable transitioning during the drag.
-      prev.className += ' disable-transition';
-      next.className += ' disable-transition';
+      prev.classList.add('disable-transition');
+      next.classList.add('disable-transition');
 
       // Add the drag handler.
       document.addEventListener('mousemove', dragHandler);
@@ -1254,8 +1244,8 @@
       isDrag = false;
       
       // Re-enable transitions.
-      prev.className = prev.className.replace(' disable-transition', '');
-      next.className = next.className.replace(' disable-transition', '');
+      prev.classList.remove('disable-transition');
+      next.classList.remove('disable-transition');
 
       // Remove the drag handler.
       document.removeEventListener('mousemove', dragHandler);

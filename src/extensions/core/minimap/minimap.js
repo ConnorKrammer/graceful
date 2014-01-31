@@ -121,7 +121,7 @@
     minimap.offsetHeight;
 
     // Fade in if the minimap is enabled.
-    if (pane.wrapper.className.indexOf('minimap-on') !== -1) {
+    if (pane.wrapper.classList.contains('minimap-on')) {
       toggleTransition(minimap, 'opacity', 'opacity 0.5s ease-in', '');
       minimap.style.opacity = 1;
     } else {
@@ -260,8 +260,7 @@
    */
   MiniMap.prototype.updateDisplay = function() {
     var wrapper         = this.pane.wrapper;
-    var measureTarget   = wrapper.parentElement.className.indexOf('splitter') === -1
-      ? wrapper : wrapper.parentElement;
+    var measureTarget   = wrapper.parentElement.classList.contains('splitter') ? wrapper : wrapper.parentElement;
     var panePercent     = parseFloat(measureTarget.style.width, 10) / 100;
     var paneParentWidth = parseFloat(getComputedStyle(measureTarget.parentElement).width, 10);
     var paneWidth       = panePercent * paneParentWidth;
@@ -271,15 +270,11 @@
 
     // If the mini-map fits, display it.
     if (editorWidth + minimapWidth + padding < paneWidth) {
-      if (wrapper.className.indexOf('minimap-on') === -1) {
-        wrapper.className = wrapper.className.replace(' minimap-off', '');
-        wrapper.className += ' minimap-on';
-      }
+      wrapper.classList.add('minimap-on');
+      wrapper.classList.remove('minimap-off');
     } else {
-      if (wrapper.className.indexOf('minimap-off') === -1) {
-        wrapper.className = wrapper.className.replace(' minimap-on', '');
-        wrapper.className += ' minimap-off';
-      }
+      wrapper.classList.add('minimap-off');
+      wrapper.classList.remove('minimap-on');
     }
 
     this.updateScroll();
