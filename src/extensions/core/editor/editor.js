@@ -3,30 +3,20 @@
  *
  * Defines the Editor class, as well as several namespaced classes (Editor.Buffer, Editor.Pane,
  * Editor.InputPane, etc.) that relate to text editing functionality.
- *
- * Dependencies: Lo-Dash:    lodash.com/docs
- *               observable: https://github.com/js-coder/observable
  */
 
 
 !function(global) {
   'use strict';
 
-  var inputModeKey   = 'filetypes.inputmode';
-  var previewModeKey = 'filetypes.previewmode';
+  var inputModeKey = 'inputmode';
+  var previewModeKey = 'previewmode';
 
   /**
    * Initial test of the Preferences extension.
    */
-  Preferences.set(inputModeKey, {
-    'mkd': { name: 'markdown-lite' },
-    'default': { name: 'markdown-lite' }
-  });
-
-  Preferences.set(previewModeKey, {
-    'mkd': parseMarkdown,
-    'default': parseMarkdown
-  });
+  Preferences.set(['filetypes.mkd.inputmode', 'filetypes.default.inputmode'], { name: 'markdown-lite' });
+  Preferences.set(['filetypes.mkd.previewmode', 'filetypes.default.previewmode'], parseMarkdown);
 
   /**
    * Parses markdown into HTML.
@@ -69,7 +59,8 @@
       filetype = 'default';
     }
 
-    return Preferences.get(key + '.' + filetype) || Preferences.get(key + '.default');
+    return Preferences.get('filetypes.' + filetype + '.' + key) ||
+      Preferences.get('filetypes.default.' + key);
   };
 
   /**
