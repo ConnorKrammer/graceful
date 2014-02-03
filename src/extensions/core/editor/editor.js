@@ -12,6 +12,66 @@
 !function(global) {
   'use strict';
 
+  var inputModeKey   = 'filetypes.inputmode';
+  var previewModeKey = 'filetypes.previewmode';
+
+  /**
+   * Initial test of the Preferences extension.
+   */
+  Preferences.set(inputModeKey, {
+    'mkd': { name: 'markdown-lite' },
+    'default': { name: 'markdown-lite' }
+  });
+
+  Preferences.set(previewModeKey, {
+    'mkd': parseMarkdown,
+    'default': parseMarkdown
+  });
+
+  /**
+   * Parses markdown into HTML.
+   *
+   * @todo Get rid of this and implement parsing using
+   *       Pandoc (http://johnmacfarlane.net/pandoc/). Doing
+   *       so will require writing a C++ binding to run scripts
+   *       on the command line.
+   */
+  function parseMarkdown(input) {
+    return marked(input, {
+      gfm: true,
+      tables: true,
+      breaks: true,
+      pedantic: false,
+      sanitize: false,
+      smartLists: true,
+      smartypants: false,
+      langPrefix: 'lang-'
+    });
+  }
+
+  /**
+   * Detects a suitable mode from a filepath.
+   *
+   * If unable to detect a mode, the default is fetched from
+   * application preferences.
+   *
+   * @param {String} filepath - The path to detect the mode from.
+   * @param {String} key - The preference key to fetch the mode from.
+   * @return {Object} The detected mode object.
+   */
+   function detectMode(filepath, key) {
+    var index, filetype;
+
+    if (filepath) {
+      index    = filepath.lastIndexOf('.');
+      filetype = filepath.substr(index + 1);
+    } else {
+      filetype = 'default';
+    }
+
+    return Preferences.get(key + '.' + filetype) || Preferences.get(key + '.default');
+  };
+
   /**
    * The Buffer class.
    *
@@ -26,18 +86,10 @@
    */
   function Buffer(text, filepath, mode, history) {
     var _this = this;
+    var index, filetype;
 
     // Mix in event handling.
     Observable(this);
-
-    // Set default and allow easy access to document text.
-    this.text = text = text || '';
-
-    // The master document.
-    this.rootDoc = mode ? CodeMirror.Doc(text, mode) : CodeMirror.Doc(text);
-
-    // Set the document history, if specified.
-    if (history) this.rootDoc.setHistory(history);
 
     // Set the initial filepath.
     if (!filepath) {
@@ -46,6 +98,18 @@
     } else {
       this.setFilepath(filepath);
     }
+
+    // Set default and allow easy access to document text.
+    this.text = text = text || '';
+
+    // Get the mode default.
+    mode = mode || detectMode(this.filepath, inputModeKey);
+
+    // The master document.
+    this.rootDoc = CodeMirror.Doc(text, mode);
+
+    // Set the document history, if specified.
+    if (history) this.rootDoc.setHistory(history);
 
     // Start with a clean state.
     this.markClean();
@@ -558,7 +622,7 @@
    * buffer in as an argument.
    *
    * @param {Buffer} buffer - The buffer to switch to.
-   * @param {Boolean} [breakLink=false] - Whether any existing link should be broken
+   * @param {Boolean} [breakLink=false] - Whether any existing link should be broken.
    * @return {Buffer} The old buffer.
    */
   Pane.prototype.switchBuffer = function(buffer, breakLink) {
@@ -577,7 +641,9 @@
     this.titleElement.innerText = buffer.title;
 
     // Stop tracking the old buffer's title changes.
-    if (this.titleChangeID) oldBuffer.off(this.titleChangeID);
+    if (typeof this.titleChangeID !== 'undefined') {
+      oldBuffer.off(this.titleChangeID);
+    }
 
     // Track the new buffer's title.
     this.titleChangeID = buffer.on('changeFilepath', function() {
@@ -738,13 +804,29 @@
    * Overrides Pane.switchBuffer().
    *
    * @param {Buffer} buffer - The buffer to switch to.
-   * @param {Boolean} [breakLink=false] - Whether any existing link should be broken
+   * @param {Boolean} [breakLink=false] - Whether any existing link should be broken.
    * @return {Buffer} The old buffer.
    */
   InputPane.prototype.switchBuffer = function(buffer, breakLink) {
+    var _this = this;
+
     this.doc = buffer.getLink();
     this.editor.swapDoc(this.doc);
     this.editor.refresh();
+
+    // Remove old event listeners.
+    if (typeof this.filetypeChangeID !== 'undefined') {
+      this.buffer.off(this.filetypeChangeID);
+    }
+    
+    // Listen for filepath changes on the new buffer.
+    this.filetypeChangeID = buffer.on('changeFilepath', function(buffer) {
+      _this.setMode(detectMode(buffer.filepath, inputModeKey));
+    });
+
+    // Detect and set a mode.
+    this.setMode(detectMode(buffer.filepath, inputModeKey));
+    
     return Pane.prototype.switchBuffer.call(this, buffer, breakLink);
   };
 
@@ -764,7 +846,7 @@
    */
   function PreviewPane(buffer, wrapper, parse) {
     // The preview function.
-    this.parse = parse;
+    this.parse = parse || detectMode(buffer.filepath, previewModeKey);
 
     // Add a preview area to the wrapper.
     this.previewArea = document.createElement('div');
@@ -780,11 +862,26 @@
    * Overrides Pane.switchBuffer().
    *
    * @param {Buffer} buffer - The buffer to switch to.
-   * @param {Boolean} [breakLink=false] - Whether any existing link should be broken
+   * @param {Boolean} [breakLink=false] - Whether any existing link should be broken.
    * @return {Buffer} The old buffer.
    */
   PreviewPane.prototype.switchBuffer = function(buffer, breakLink) {
-    if (this.changeID !== undefined) {
+    var _this = this;
+
+    // Remove old event listeners.
+    if (typeof this.filetypeChangeID !== 'undefined') {
+      this.buffer.off(this.filetypeChangeID);
+    }
+    
+    // Listen for filepath changes on the new buffer.
+    this.filetypeChangeID = buffer.on('changeFilepath', function(buffer) {
+      _this.parse = detectMode(buffer.filepath, previewModeKey);
+    });
+
+    // Detect and set a mode.
+    this.parse = detectMode(buffer.filepath, previewModeKey);
+
+    if (typeof this.changeID !== 'undefined') {
       this.buffer.off(this.changeID);
     }
 
@@ -846,37 +943,9 @@
    * @todo Get rid of this.
    */
   Editor.prototype.init = function() {
-    /*
-    // Parsing function for a preview pane.
-    var previewFunction = function(text) {
-      return marked(text, {
-        gfm: true,
-        tables: true,
-        breaks: true,
-        pedantic: false,
-        sanitize: false,
-        smartLists: true,
-        smartypants: false,
-        langPrefix: 'lang-'
-      });
-    };
-    */
-
-    // Test pane mode configuration.
-    var modeConfig = {
-      name: 'markdown-lite',
-      highlightFormatting: true,
-      fencedCodeBlocks: true,
-      taskLists: true
-    };
-
-    // Add the test pane.
-    var input = this.addPane(InputPane, [new Buffer('', null, modeConfig)], 'horizontal');
-
-    /*
-    var input2  = this.addPane(InputPane, [new Buffer('')], 'horizontal');
-    var preview = this.addPane(PreviewPane, [new Buffer(''), null, previewFunction], 'vertical', input2);
-    */
+    // Add the test panes.
+    var input = this.addPane(InputPane, new Buffer(), 'horizontal');
+    var preview = this.addPane(PreviewPane, new Buffer(), 'horizontal');
   };
 
   /**
@@ -897,6 +966,9 @@
   Editor.prototype.addPane = function(constructor, args, type, parentPane) {
     var container = this.container;
     var pane, factoryFunction, wrapper, focusPane;
+
+    // Default args to an array.
+    args = [].concat(args);
 
     // Keep a reference to the focus pane, since a vertical split could de-focus it.
     focusPane = this.getFocusPane();
@@ -950,7 +1022,9 @@
     // Vertical splits cause display issues.
     if (type === 'vertical') {
       _.forEach(this.panes, function(pane) {
-        pane.editor.refresh();
+        if (pane.type === 'input') {
+          pane.editor.refresh();
+        }
       });
     }
 
