@@ -184,7 +184,7 @@
   /**
    * Scrolls the editor and the minimap to the given position.
    *
-   * @param {number} scrollTop - The position to scroll the top of the editor to.
+   * @param {Number} scrollTop - The position to scroll the top of the editor to.
    */
   MiniMap.prototype.scrollToPosition = function(scrollTop) {
     var scrollInfo   = this.cm.getScrollInfo();
@@ -285,7 +285,7 @@
    * @see http://blog.stevenlevithan.com/archives/faster-than-innerhtml
    *
    * @param {Element} element - The element to alter.
-   * @param {string} html - The new element contents.
+   * @param {String} html - The new element contents.
    * @return {Element} The replaced element.
    */
   function replaceHTML(el, html) {
@@ -304,9 +304,9 @@
    * after it finishes.
    *
    * @param {Element} element - The element to operate on.
-   * @param {string} property - The property to transition.
-   * @param {string} transition - The transition to run.
-   * @param {string|value} afterValue - An optional value to set the property to
+   * @param {String} property - The property to transition.
+   * @param {String} transition - The transition to run.
+   * @param {String|Number} afterValue - An optional value to set the property to
    *        after the transition is complete.
    */
   function toggleTransition(element, property, transition, afterValue) {

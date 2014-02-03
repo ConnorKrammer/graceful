@@ -25,7 +25,6 @@
     return FileSystem.fileExists(graceful.preferenceFile)
       .then(function(doesExist) {
         if (!doesExist) {
-          console.log("preferences.json not found. New file created.");
           return FileSystem.writeFile(graceful.preferenceFile, '');
         }
       })

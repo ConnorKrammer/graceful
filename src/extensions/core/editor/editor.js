@@ -81,7 +81,7 @@
    * @constructor
    * @param {String} [text=''] - The text to begin the document with.
    * @param {String} [filepath=null] - The filepath to associate the buffer with.
-   * @param {object|string} [mode] - The CodeMirror mode to use for the document.
+   * @param {Object|String} [mode] - The CodeMirror mode to use for the document.
    * @param {Object} [history] - Any edit history to attach to the buffer.
    */
   function Buffer(text, filepath, mode, history) {
@@ -152,7 +152,7 @@
    * be marked as clean, unless otherwise specified.
    *
    * @param {String} content - The new editor content.
-   * @param {boolean} [isClean] - Whether to set the editor contents as clean.
+   * @param {Boolean} [isClean] - Whether to set the editor contents as clean.
    */
   Buffer.prototype.setContent = function(content, isClean) {
     this.rootDoc.setValue(content);
@@ -163,7 +163,7 @@
    * Mark the buffer as clean or dirty.
    * This is useful for tracking when to save a file.
    *
-   * @param {boolean} [isClean=true] Whether to mark the buffer as clean or not.
+   * @param {Boolean} [isClean=true] Whether to mark the buffer as clean or not.
    */
   Buffer.prototype.markClean = function(isClean) {
     this.isClean = (isClean === false) ? false : true;
@@ -268,7 +268,7 @@
    *
    * @param {Element} parentElement - The element to add the transitioned element to.
    * @param {Element} element - The element to fade in.
-   * @param {number} duration - The duration, in milliseconds, of the fade.
+   * @param {Number} duration - The duration, in milliseconds, of the fade.
    * @param {String} easing - The easing function to use for the transition.
    */
   function fadeIn(parentElement, element, duration, easing) {
@@ -301,7 +301,7 @@
    * easing. Note that the easing function must be CSS-compliant.
    *
    * @param {Element} element - The element to fade out.
-   * @param {number} duration - The duration, in milliseconds, of the fade.
+   * @param {Number} duration - The duration, in milliseconds, of the fade.
    * @param {String} easing - The easing function to use for the transition.
    */
   function fadeOut(element, duration, easing) {
@@ -333,12 +333,12 @@
    * @param {Element} line - The element to use.
    *
    * @param {Object} origin - The start point of the line in screen coordinates.
-   * @param {number} origin.x - The x position of the origin.
-   * @param {number} origin.y - The y position of the origin.
+   * @param {Number} origin.x - The x position of the origin.
+   * @param {Number} origin.y - The y position of the origin.
    *
    * @param {Object} destination - The end point of the line in screen coordinates.
-   * @param {number} destination.x - The x position of the destination.
-   * @param {number} destination.y - The y position of the destination.
+   * @param {Number} destination.x - The x position of the destination.
+   * @param {Number} destination.y - The y position of the destination.
    */
   function drawLine(line, origin, destination) {
     // Get the length of the line.
@@ -381,7 +381,7 @@
   /**
    * Resets the link process and links the panes based upon the mouse position.
    *
-   * @param {boolean} [makeLink=true] - Whether to link the panes, if possible.
+   * @param {Boolean} [makeLink=true] - Whether to link the panes, if possible.
    */
   StatusLight.prototype.endLink = function(makeLink) {
     makeLink = makeLink || (typeof makeLink === 'undefined') ? true : false;
@@ -677,7 +677,7 @@
    * to a different buffer.
    *
    * @param {Pane} pane - The pane to link to. Passing a falsey value will remove all links.
-   * @return {boolean} False if a circular reference would be created, otherwise true.
+   * @return {Boolean} False if a circular reference would be created, otherwise true.
    */
   Pane.prototype.linkToPane = function(pane) {
     // Prevent linking to self.
@@ -1393,7 +1393,7 @@
    * fetches the command from the editor's command hash.
    *
    * @param {String} input - The input command string.
-   * @return {Array|false} An array with a Command instance in the first
+   * @return {Array|False} An array with a Command instance in the first
    *         index, and an array of arguments to pass to the command
    *         in the second. A special command is returned if the input
    *         is unrecognized, and false is returned on blank input.
@@ -1600,7 +1600,7 @@
   /**
    * Returns the focused pane.
    *
-   * @return {Pane|false} The focused pane, or false if no pane has focus.
+   * @return {Pane|False} The focused pane, or false if no pane has focus.
    */
   Editor.prototype.getFocusPane = function() {
     return _.find(this.panes, 'isFocused') || false;
@@ -1610,7 +1610,7 @@
    * Returns the pane with the specified element as a wrapper.
    *
    * @param {Element} element - The wrapper element to find the pane of.
-   * @return {Pane|false} The pane with the given wrapper, or false if no
+   * @return {Pane|False} The pane with the given wrapper, or false if no
    *         pane has the wrapper specified.
    */
   Editor.prototype.getPaneByElement = function(element) {
