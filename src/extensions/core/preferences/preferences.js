@@ -70,7 +70,7 @@
     if (!key) return;
 
     // Set the value on all passed keys.
-    _.forEach([].concat(key), function() {
+    _.forEach([].concat(key), function(key) {
       // Split the key into subkeys.
       key  = key.split('.');
       last = key.pop();
