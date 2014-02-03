@@ -1,0 +1,141 @@
+/**
+ * graceful-preferences
+ *
+ * Defines the Preferences global object, responsible for managing
+ * application preferences.
+ */
+
+
+!function(global) {
+  'use strict';
+
+  // Define the Preferences namespace.
+  function Preferences() {}
+
+  // Preference storage objects.
+  var prefs;
+  var userPrefs;
+
+  /**
+   * Loads saved preferences from file.
+   *
+   * @return {Promise} A promise that the preferences have loaded.
+   */
+  Preferences.load = function() {
+    return FileSystem.fileExists(graceful.preferenceFile)
+      .then(function(doesExist) {
+        if (!doesExist) {
+          console.log("preferences.json not found. New file created.");
+          return FileSystem.writeFile(graceful.preferenceFile, '');
+        }
+      })
+      .then(function() {
+        return FileSystem.readFile(graceful.preferenceFile);
+      })
+      .then(function(contents) {
+        prefs = contents ? JSON.parse(contents) : {};
+      })
+      .then(function() {
+        return FileSystem.fileExists(graceful.userPreferenceFile)
+      })
+      .then(function(doesExist) {
+        if (doesExist) return FileSystem.readFile(graceful.userPreferenceFile);
+      })
+      .then(function(contents) {
+        userPrefs = contents ? JSON.parse(contents) : {};
+      })
+      .fail(function(error) {
+        Utils.printFormattedError('Preferences failed to load with error:', error);
+      });
+  };
+  
+  /**
+   * Sets the given preference, creating it from scratch if needed.
+   *
+   * Conditions:
+   * Key..............Preference set using key.
+   * Key and subkey...Preference set using subkey.
+   * Neither..........Does nothing.
+   *
+   * Example of key: "User.Editor.FontSize"
+   *
+   * @param {String} [key] - The main preference key, with
+   *        subkeys denoted using '.' object notation.
+   * @param {*} data - The data to set.
+   */
+  Preferences.setPreference = function(key, data) {
+    var pref, last;
+
+    // Do nothing if the key is empty.
+    if (!key) return;
+
+    // Split the key into subkeys.
+    key  = key.split('.');
+    last = key.pop();
+
+    // Find the correct pref to set, creating intermediate prefs.
+    pref = _.reduce(key, function(accumulator, subkey) {
+      if (typeof accumulator[subkey] !== 'object') {
+        accumulator[subkey] = {};
+      }
+
+      return accumulator[subkey];
+    }, prefs);
+
+    // Set the preference.
+    pref[last] = data;
+
+    // Save preferences.
+    FileSystem.writeFile(graceful.preferenceFile, JSON.stringify(prefs, null, 4));
+  };
+
+  /**
+   * Returns the value of the given preference.
+   * User preferences override application preferences.
+   *
+   * Conditions:
+   * Key..............Preference fetched from key.
+   * Key and subkey...Preference fetched from subkey.
+   * Neither..........Entire preference object fetched.
+   *
+   * Example of key: "User.Editor.FontSize"
+   *
+   * @param {String} [key] - The main preference key, with
+   *        subkeys denoted using '.' object notation.
+   * @param {Boolean} [ignoreUser=false] - Whether to ignore
+   *        user-set preferences when fetching the value.
+   * @return {*} The data set on the key combination.
+   */
+  Preferences.getPreference = function(key, ignoreUser) {
+    var userValue, appValue;
+
+    // Set defaults.
+    ignoreUser = ignoreUser || false;
+
+    // Return the full object if the key is empty.
+    if (!key) {
+      return ignoreUser ? prefs : _.merge(prefs, userPrefs);
+    }
+
+    // Split the key into subkeys.
+    key = key.split('.');
+
+    // Get the user preference.
+    if (!ignoreUser) {
+      userValue = _.reduce(key, function(accumulator, subkey) {
+        return accumulator ? accumulator[subkey] : accumulator;
+      }, userPrefs);
+    }
+
+    // Get the application preference.
+    appValue = _.reduce(key, function(accumulator, subkey) {
+      return accumulator ? accumulator[subkey] : accumulator;
+    }, prefs);
+
+    // Return the preference.
+    return userValue || appValue;
+  };
+
+  // Expose globals.
+  global.Preferences = Preferences;
+}(this);

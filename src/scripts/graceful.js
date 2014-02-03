@@ -20,6 +20,13 @@
   function Graceful() {
     var _this = this;
 
+    // Get the on-disk location of the app's base directory.
+    this.appDirectory = window.location.pathname.split('/').slice(1, -1).join('/') + '/';
+
+    // Get the locations of the preference files.
+    this.preferenceFile     = this.appDirectory + 'preferences.json';
+    this.userPreferenceFile = this.appDirectory + 'user.preferences.json';
+
     // These are all relative to the index.html file.
     this.vendorDirectory        = './vendor/';
     this.scriptDirectory        = './scripts/';
@@ -41,13 +48,16 @@
     // Define a helper object that allows extensions to set which files to load.
     this.loader = {
       files: [],
-      loadExtension: function(files) {
+      loadExtension: function(files, func) {
         var fileList = [].concat(files);
         fileList = _.map(fileList, function(file) {
           return _this.extensionDirectory + file;
         });
 
-        this.files = this.files.concat(fileList);
+        this.files.push({
+          files: fileList,
+          func: func
+        });
       },
       clear: function() {
         this.files = [];

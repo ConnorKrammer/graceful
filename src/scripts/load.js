@@ -15,8 +15,12 @@
  *
  * Note that yepnope loads things asynchronously, but *does* preserve load order.
  *
+ * If an extension requires some (asynchronous) setup before it can be used,
+ * loading is paused until after that extension has finished setup. Without this,
+ * dependency management would be an utter nightmare.
+ *
  * Below is an example of the great power of promises. Without them, yepnope's
- * loading looks like hell--the 'complete' callbacks end up nested 7(!!!) deep.
+ * loading would look like hell--the 'complete' callbacks end up nested 7(!!!) deep.
  */
 
 !function(global) {
@@ -34,10 +38,12 @@
   graceful.coreExtensions = [
     'utils',
     'filesystem',
+    'preferences',
     'editor',
     'minimap'
   ];
 
+  var loader = graceful.loader;
   var libs = buildFilepath(graceful.coreLibraries, graceful.vendorDirectory);
   var core = buildFilepath(graceful.coreExtensions, graceful.coreExtensionDirectory, '/load.js');
   var user;
@@ -50,10 +56,9 @@
           return loadAsync(core);
         })
         .then(function() {
-          return loadAsync(graceful.loader.files);
+          return loadAndWait(loader.files);
         })
         .then(function() {
-          graceful.loader.clear();
           return loadAsync([graceful.mainFile, graceful.configFile]);
         })
         .then(function() {
@@ -61,11 +66,13 @@
           return loadAsync(user);
         })
         .then(function() {
-          return loadAsync(graceful.loader.files);
+          return loadAndWait(loader.files);
         })
         .then(function() {
-          graceful.loader.clear();
           graceful.loadComplete();
+        })
+        .fail(function(error) {
+          Utils.printFormattedError('Loading failed with error:', error);
         });
     }
   });
@@ -96,7 +103,7 @@
    * Can only be called after the Q library has loaded.
    *
    * @param {String|String[]} files - The files to load.
-   * @return {Promise} A promise for the operation's completion.
+   * @return {Promise} A promise that the files were loaded.
    */
   function loadAsync(files) {
     var deferred = Q.defer();
@@ -112,6 +119,59 @@
 
     // Return the promise.
     return deferred.promise;
+  }
+
+  /**
+   * Takes the graceful loader object and reduces the files to
+   * load down into a single promise. This is necessary in case
+   * an asynchronous function needs to be executed before loading
+   * should continue.
+   *
+   * Several groups of files may be bundled together as long as there
+   * is no function in between to break them up. This allows as many
+   * files as possible to load at the same time.
+   *
+   * Note that load order is preserved in all cases.
+   *
+   * @param {Object[]} collection - A collection of file/function pairs.
+   * @param {String[]} collection.files - The files to iterate over.
+   * @param {Function} [collection.func] - A promise-returning callback.
+   * @return {Promise} A promise that the files were loaded.
+   */
+  function loadAndWait(collection) {
+    var stored, chain, next;
+
+    /**
+     * Simply wraps a call to loadAsync() and then
+     * executes the given function.
+     *
+     * @param {String|String[]} files - The files to load.
+     * @param {Function} func - A function to execute after load.
+     * @return {Promise} A promise that the files were loaded.
+     */
+    function load(files, func) {
+      return loadAsync(files).then(func);
+    }
+
+    // Starting values.
+    stored = [];
+    chain = Q();
+
+    // Reduce the files down into a promise.
+    while (collection.length > 0) {
+      next = collection.shift();
+      stored = stored.concat(next.files);
+      
+      // If there's no function to wait on, just keep bundling the files.
+      if (typeof next.func !== 'function') continue;
+
+      // Load all the batched files, binding the correct values.
+      chain  = chain.then(load.bind(null, stored, next.func));
+      stored = [];
+    }
+
+    // Load any leftover batched files, and return.
+    return chain.then(function() { return loadAsync(stored); });
   }
 }(this);
 
