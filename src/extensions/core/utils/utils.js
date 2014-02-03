@@ -3,6 +3,8 @@
  *
  * Adds the Utils object to the global namespace, responsible for general-purpose
  * functions that don't fit better in another core extension.
+ *
+ * @todo Refactor debugging utilities into their own extension.
  */
 
 
@@ -70,6 +72,37 @@
         return 'Invalid error code given.';
     }
   }
+
+  /**
+   * Controls whether debugging tools will print to the console.
+   */
+  Utils.DEBUG_ON = true;
+
+  /**
+   * Controls the verbosity of debugging tools.
+   */
+  Utils.DEBUG_VERBOSE = false;
+
+  /**
+   * Outputs an error message to the console, with the given
+   * description in bold and the error message printed after
+   * a newline.
+   *
+   * Will print a stack trace if DEBUG_VERBOSE is true.
+   * Will not run if DEBUG_ON is set to false.
+   *
+   * @param {String} description - A description of what the error affects.
+   * @param {Error} error - The error.
+   */
+  Utils.printFormattedError = function(description, error) {
+    var message;
+
+    if (this.DEBUG_ON) {
+      message = this.DEBUG_VERBOSE ? error.stack : error.message;
+      console.log('%c' + description + '\n%c' + message,
+          'font-weight: bold;', 'font-weight: normal;');
+    }
+  };
 
   // Expose globals.
   global.Utils = Utils;

@@ -1364,19 +1364,6 @@
   };
 
   /**
-   * Outputs an error message for debugging.
-   *
-   * @param {Error} error - The error to use for the message.
-   * @param {Command} command - The command causing the error.
-   */
-  function handleCommandError(error, command) {
-    console.log("%cEditor command '" 
-      + command.name + "' failed with error:\n%c" 
-      + error.message, "font-weight: bold;", "font-weight: normal;");
-    //console.log(error.stack);
-  }
-
-  /**
    * Run the specified command or array of commands. Commands can
    * be passed in as either a string to be parsed (as from the
    * command bar) or as an array of such strings.
@@ -1432,7 +1419,11 @@
         }
         else {
           historyItem[index].result = 'Failed: ' + error.message;
-          handleCommandError(error, command);
+        }
+
+        if (!failHard) {
+          Utils.printFormattedError("Editor command '" + command.name
+            + "' failed with error:", error);
         }
 
         // Skip remaining commands.
