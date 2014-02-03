@@ -59,8 +59,9 @@
    *
    * Example of key: "User.Editor.FontSize"
    *
-   * @param {String} [key] - The main preference key, with
-   *        subkeys denoted using '.' object notation.
+   * @param {String|String[]} [key] - The main preference key, with
+   *        subkeys denoted using '.' object notation. If an array is
+   *        passed, the same value will be set on all keys.
    * @param {*} data - The data to set.
    */
   Preferences.set = function(key, data) {
@@ -69,21 +70,24 @@
     // Do nothing if the key is empty.
     if (!key) return;
 
-    // Split the key into subkeys.
-    key  = key.split('.');
-    last = key.pop();
+    // Set the value on all passed keys.
+    _.forEach([].concat(key), function() {
+      // Split the key into subkeys.
+      key  = key.split('.');
+      last = key.pop();
 
-    // Find the correct pref to set, creating intermediate prefs.
-    pref = _.reduce(key, function(accumulator, subkey) {
-      if (typeof accumulator[subkey] !== 'object') {
-        accumulator[subkey] = {};
-      }
+      // Find the correct pref to set, creating intermediate prefs.
+      pref = _.reduce(key, function(accumulator, subkey) {
+        if (typeof accumulator[subkey] !== 'object') {
+          accumulator[subkey] = {};
+        }
 
-      return accumulator[subkey];
-    }, prefs);
+        return accumulator[subkey];
+      }, prefs);
 
-    // Set the preference.
-    pref[last] = data;
+      // Set the preference.
+      pref[last] = data;
+    });
 
     // Save preferences.
     FileSystem.writeFile(graceful.preferenceFile, JSON.stringify(prefs, null, 4));
@@ -104,7 +108,8 @@
    *        subkeys denoted using '.' object notation.
    * @param {Boolean} [ignoreUser=false] - Whether to ignore
    *        user-set preferences when fetching the value.
-   * @return {*} The data set on the key combination.
+   * @return {*} The data set on the key combination, or
+   *         undefined if an invalid key is used.
    */
   Preferences.get = function(key, ignoreUser) {
     var userValue, appValue;
@@ -113,28 +118,41 @@
     ignoreUser = ignoreUser || false;
 
     // Return the full object if the key is empty.
-    if (!key) {
-      return ignoreUser ? prefs : _.merge(prefs, userPrefs);
-    }
-
-    // Split the key into subkeys.
-    key = key.split('.');
+    if (!key) return ignoreUser ? prefs : _.merge(prefs, userPrefs);
 
     // Get the user preference.
-    if (!ignoreUser) {
-      userValue = _.reduce(key, function(accumulator, subkey) {
-        return accumulator ? accumulator[subkey] : accumulator;
-      }, userPrefs);
-    }
+    if (!ignoreUser) userValue = reducePreference(key, userPrefs);
 
     // Get the application preference.
-    appValue = _.reduce(key, function(accumulator, subkey) {
-      return accumulator ? accumulator[subkey] : accumulator;
-    }, prefs);
+    appValue = reducePreference(key, prefs);
 
     // Return the preference.
     return userValue || appValue;
   };
+
+  /**
+   * Helper function that fetches a property off of an
+   * object based on the passed key. If the key is invalid
+   * (ie. doesn't point to a property) then undefined will
+   * be returned.
+   *
+   * @param {String} key - The main preference key, with
+   *        subkeys denoted using '.' object notation.
+   * @param {Object} object - The object to reduce.
+   * @return {*} The data set on the key combination, or
+   *         undefined if an invalid key is used.
+   */
+  function reducePreference(key, object) {
+    // Split the key into subkeys.
+    key = key.split('.');
+
+    // Get the preference.
+    return _.reduce(key, function(accumulator, subkey) {
+      return (typeof accumulator !== 'undefined')
+      ? accumulator[subkey]
+      : accumulator;
+    }, object);
+  }
 
   // Expose globals.
   global.Preferences = Preferences;
