@@ -63,7 +63,7 @@
    *        subkeys denoted using '.' object notation.
    * @param {*} data - The data to set.
    */
-  Preferences.setPreference = function(key, data) {
+  Preferences.set = function(key, data) {
     var pref, last;
 
     // Do nothing if the key is empty.
@@ -106,7 +106,7 @@
    *        user-set preferences when fetching the value.
    * @return {*} The data set on the key combination.
    */
-  Preferences.getPreference = function(key, ignoreUser) {
+  Preferences.get = function(key, ignoreUser) {
     var userValue, appValue;
 
     // Set defaults.
