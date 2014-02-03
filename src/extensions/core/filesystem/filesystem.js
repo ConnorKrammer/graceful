@@ -42,14 +42,17 @@
    * Writes data to disk and returns a promise.
    * Only supports UTF-8 encoding.
    *
+   * If the data parameter is omitted then the document will
+   * be created but left empty.
+   *
    * @param {String} path - The path to write to.
-   * @param {String} data - The data to write.
+   * @param {String} [data] - The data to write.
    * @return {Promise} A promise for the operation's completion.
    */
   FileSystem.writeFile = function(path, data) {
     var deferred = Q.defer();
 
-    appshell.fs.writeFile(path, data, 'utf8', function(error) {
+    appshell.fs.writeFile(path, data || '', 'utf8', function(error) {
       if (error === appshell.fs.NO_ERROR) {
         deferred.resolve();
       } else {
@@ -64,8 +67,11 @@
    * Writes data to a file, recursively creating any needed folders
    * along the way. Only supports UTF-8 encoding.
    *
+   * If the data parameter is omitted then the document will
+   * be created but left empty.
+   *
    * @param {String} path - The path to write to.
-   * @param {String} data - The data to write.
+   * @param {String} [data] - The data to write.
    * @return {Promise} A promise for the operation's completion.
    */
   FileSystem.writeFileRecursive = function(path, data) {

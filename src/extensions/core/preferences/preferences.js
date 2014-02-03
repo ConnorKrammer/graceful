@@ -25,7 +25,7 @@
     return FileSystem.fileExists(graceful.preferenceFile)
       .then(function(doesExist) {
         if (!doesExist) {
-          return FileSystem.writeFile(graceful.preferenceFile, '');
+          return FileSystem.writeFile(graceful.preferenceFile);
         }
       })
       .then(function() {
