@@ -130,6 +130,27 @@
   };
 
   /**
+   * Sets a preference only if that preference has not already
+   * been set.
+   *
+   * See Preferences.set() for a description of valid keys.
+   *
+   * @param {String|String[]} [key] - The main preference key, with
+   *        subkeys denoted using '.' object notation. If an array is
+   *        passed, the same value will be set on all keys.
+   * @param {*} data - The data to set.
+   */
+  Preferences.default = function(key, data) {
+    var key = [].concat(key);
+
+    // Iterate over keys, only setting those without values.
+    for (var i = 0; i < key.length; i++) {
+      if (typeof this.get(key[i], true) !== 'undefined') continue;
+      this.set(key[i], data);
+    }
+  };
+
+  /**
    * Helper function that fetches a property off of an
    * object based on the passed key. If the key is invalid
    * (ie. doesn't point to a property) then undefined will
