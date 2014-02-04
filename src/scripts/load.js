@@ -4,23 +4,23 @@
  * Loading order is as follows:
  *   + Core libraries, such as Lo-Dash and Q.
  *   + Core extensions.
- *     - First, the load.js files are loaded and the paths
+ *     - First, the load.js files are loaded, and the paths
  *       for the needed files stored.
- *     - Then those files are loaded by yepnope.
- *   + main.js is loaded, along with user.config.js.
- *   + Finally, user extensions are loaded.
- *     - First, the load.js files are loaded and the paths for
+ *     - Then those files are loaded using yepnope.
+ *   + main.js is loaded.
+ *   + User extensions are loaded based on the user preference file.
+ *     - First, the load.js files are loaded, and the paths for
  *       the needed files stored. (Exactly like core extensions.)
- *     - Then those files are loaded by yepnope.
+ *     - Then those files are loaded using yepnope.
+ *   + Finally, user.config.js is loaded.
  *
  * Note that yepnope loads things asynchronously, but *does* preserve load order.
  *
  * If an extension requires some (asynchronous) setup before it can be used,
- * loading is paused until after that extension has finished setup. Without this,
- * dependency management would be an utter nightmare.
+ * loading is paused until after that extension has finished setup.
  *
  * Below is an example of the great power of promises. Without them, yepnope's
- * loading would look like hell--the 'complete' callbacks end up nested 7(!!!) deep.
+ * loading would look like [callback hell](http://callbackhell.com/).
  */
 
 !function(global) {
@@ -59,14 +59,18 @@
           return loadAndWait(loader.files);
         })
         .then(function() {
-          return loadAsync([graceful.mainFile, graceful.configFile]);
+          return loadAsync(graceful.mainFile);
         })
         .then(function() {
+          graceful.userExtensions = Preferences.get('extensions.userExtensions') || '';
           user = buildFilepath(graceful.userExtensions, graceful.userExtensionDirectory, '/load.js');
           return loadAsync(user);
         })
         .then(function() {
           return loadAndWait(loader.files);
+        })
+        .then(function() {
+          return loadAsync(graceful.configFile);
         })
         .then(function() {
           graceful.loadComplete();
@@ -82,8 +86,8 @@
    * the resulting array. Can optionally append a suffix.
    *
    * @param {String[]} files - The files to prefix.
-   * @param {string} prefix - The prefix.
-   * @param {string} [suffix] - An optional suffix.
+   * @param {String} prefix - The prefix.
+   * @param {String} [suffix] - An optional suffix.
    * @return {String[]} An array of the newly mapped strings.
    */
   function buildFilepath(files, prefix, suffix) {

@@ -12,26 +12,12 @@
  * @todo Move command definitions out of this file.
  */
 
-'use strict';
+!function(global) {
+  'use strict';
 
-/** 
- * Define extensions to load from the extensions/user directory 
- * by specifying their folder names here.
- *
- * @todo Consider moving the user extensions into a preference. This
- *       would eliminate the need to wrap everything in an onLoad() call
- *       (and would actually deprecate the onLoad() function).
- */
-graceful.userExtensions = [
-
-];
-
-/**
- * While all the core functions are loaded before this file, it's best to wrap
- * things in an onLoad() call to ensure that everything is available. This is 
- * necessary for user extensions.
- */
-graceful.onLoad(function() {
+/* =======================================================
+ *              Feel free to edit below here.
+ * ======================================================= */
 
   /**
    * Link the current pane to the specified pane. (Determined by index.)
@@ -121,7 +107,7 @@ graceful.onLoad(function() {
     appshell.app.closeLiveBrowser();
     appshell.app.quit();
   });
-  
+
   /**
    * Closes the focused pane.
    */
@@ -165,7 +151,7 @@ graceful.onLoad(function() {
 
       if (firstChars === './' || firstChars === '.\\') {
         path = buffer.filepath.substr(0, buffer.filepath.lastIndexOf(buffer.title))
-             + path.substr(2);
+          + path.substr(2);
       }
     }
 
@@ -174,28 +160,28 @@ graceful.onLoad(function() {
         if (type === 'file') {
           // If it's an existing file, open it.
           return FileSystem.readFile(path)
-            .then(function(contents) {
-              focusPane.switchBuffer(new Editor.Buffer(contents, path), true);
-            });
+        .then(function(contents) {
+          focusPane.switchBuffer(new Editor.Buffer(contents, path), true);
+        });
         }
         else if (type === 'directory') {
           // If it's an existing directory, start the open dialogue there.
           return FileSystem.showOpenDialog(null, path)
-            .then(function(selection) {
-              return FileSystem.readFile(selection)
-                .then(function(contents) {
-                  focusPane.switchBuffer(new Editor.Buffer(contents, selection), true);
-                });
-            })
+        .then(function(selection) {
+          return FileSystem.readFile(selection)
+          .then(function(contents) {
+            focusPane.switchBuffer(new Editor.Buffer(contents, selection), true);
+          });
+        })
         }
         else if (!type || !path) {
           // If there is no path, start the open dialogue at the last used location.
           return FileSystem.showOpenDialog()
             .then(function(selection) {
               return FileSystem.readFile(selection)
-                .then(function(contents) {
-                  focusPane.switchBuffer(new Editor.Buffer(contents, selection), true);
-                });
+              .then(function(contents) {
+                focusPane.switchBuffer(new Editor.Buffer(contents, selection), true);
+              });
             });
         }
       });
@@ -234,7 +220,7 @@ graceful.onLoad(function() {
 
       if (firstChars === './' || firstChars === '.\\') {
         path = buffer.filepath.substr(0, buffer.filepath.lastIndexOf(buffer.title))
-             + path.substr(2);
+          + path.substr(2);
       }
     }
 
@@ -243,34 +229,34 @@ graceful.onLoad(function() {
         if (type === 'file') {
           // If it's an existing file, overwrite it.
           return FileSystem.writeFile(path, buffer.text)
-            .then(function() {
-              buffer.filepath = path;
-            });
+        .then(function() {
+          buffer.filepath = path;
+        });
         }
         else if (type === 'directory') {
           // If it's an existing directory, open the save dialogue there.
           return FileSystem.showSaveDialogue(null, path, buffer.title)
-            .then(function(selection) {
-              return FileSystem.writeFile(selection, buffer.text)
-                .then(function() {
-                  buffer.filepath = selection;
-                });
-            });
+        .then(function(selection) {
+          return FileSystem.writeFile(selection, buffer.text)
+          .then(function() {
+            buffer.filepath = selection;
+          });
+        });
         }
         else if (!type && path && (lastChar === '/' || lastChar === '\\')) {
           // If it's an uncreated directory, create it. If the user cancels, delete it again.
           return FileSystem.makeDirectory(path)
             .then(function() {
               FileSystem.showSaveDialogue(null, path, buffer.title)
-                .then(function(selection) {
-                  return FileSystem.writeFile(selection, buffer.text)
-                    .then(function() {
-                      buffer.filepath = selection;
-                    });
-                })
-                .fail(function(error) {
-                  FileSystem.unlink(path);
+              .then(function(selection) {
+                return FileSystem.writeFile(selection, buffer.text)
+                .then(function() {
+                  buffer.filepath = selection;
                 });
+              })
+            .fail(function(error) {
+              FileSystem.unlink(path);
+            });
             });
         }
         else if (!type && path) {
@@ -286,12 +272,17 @@ graceful.onLoad(function() {
           return FileSystem.showSaveDialogue(null, null, buffer.title)
             .then(function(selection) {
               return FileSystem.writeFile(selection, buffer.text)
-                .then(function() {
-                  buffer.filepath = selection;
-                });
+              .then(function() {
+                buffer.filepath = selection;
+              });
             });
         }
       });
   });
-});
+
+/* =======================================================
+ *              Feel free to edit above here.
+ * ======================================================= */
+
+}(this);
 
