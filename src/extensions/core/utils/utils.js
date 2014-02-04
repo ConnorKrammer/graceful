@@ -104,6 +104,19 @@
     }
   };
 
+  /**
+   * Set default preferences and load in preferences.
+   */
+  graceful.onLoad(function() {
+    Preferences.default('extensions.core.utils.debug', {
+      enabled: true,
+      verbose: false
+    });
+
+    Utils.DEBUG_VERBOSE = Preferences.get('extensions.core.utils.debug.enabled');
+    Utils.DEBUG_VERBOSE = Preferences.get('extensions.core.utils.debug.verbosity');
+  });
+
   // Expose globals.
   global.Utils = Utils;
 }(this);

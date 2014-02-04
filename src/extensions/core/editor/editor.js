@@ -15,8 +15,8 @@
   /**
    * Initial test of the Preferences extension.
    */
-  Preferences.set(['filetypes.mkd.inputmode', 'filetypes.default.inputmode'], { name: 'markdown-lite' });
-  Preferences.set(['filetypes.mkd.previewmode', 'filetypes.default.previewmode'], parseMarkdown);
+  Preferences.default(['filetypes.mkd.inputmode', 'filetypes.default.inputmode'], { name: 'markdown-lite' });
+  Preferences.default(['filetypes.mkd.previewmode', 'filetypes.default.previewmode'], parseMarkdown);
 
   /**
    * Parses markdown into HTML.
