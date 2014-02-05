@@ -230,7 +230,7 @@
           // If it's an existing file, overwrite it.
           return FileSystem.writeFile(path, buffer.text)
         .then(function() {
-          buffer.filepath = path;
+          buffer.setFilepath(path);
         });
         }
         else if (type === 'directory') {
@@ -239,7 +239,7 @@
         .then(function(selection) {
           return FileSystem.writeFile(selection, buffer.text)
           .then(function() {
-            buffer.filepath = selection;
+            buffer.setFilepath(path);
           });
         });
         }
@@ -251,13 +251,13 @@
               .then(function(selection) {
                 return FileSystem.writeFile(selection, buffer.text)
                 .then(function() {
-                  buffer.filepath = selection;
+                  buffer.setFilepath(path);
                 });
               })
             .fail(function(error) {
               FileSystem.unlink(path);
             });
-            });
+          });
         }
         else if (!type && path) {
           // If an uncreated file is specified, recursively create the filepath and save it.
@@ -273,7 +273,7 @@
             .then(function(selection) {
               return FileSystem.writeFile(selection, buffer.text)
               .then(function() {
-                buffer.filepath = selection;
+                buffer.setFilepath(path);
               });
             });
         }
