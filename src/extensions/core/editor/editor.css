@@ -172,7 +172,9 @@ body {
   transition: height 0.5s cubic-bezier(0.3, 0.4, 0.3, 1);
 }
 
-/* TODO: Figure out what this does again. */
+/* Extend vertical splitter to touch edge of pane.
+ * This compensates for the space added to accomodate
+ * the horizontal splitters. */
 .vertical-splitter-pane > .splitter-vertical {
   padding-right: 5px;
 }
@@ -194,6 +196,11 @@ body {
   -webkit-user-select: none;
 }
 
+/* Add padding to interior. */
+.pane:not(.vertical-splitter-pane) > :first-child {
+  padding: 0 15px;
+}
+
 #editor > .pane {
   display: inline-block;
   vertical-align: top;
@@ -204,7 +211,8 @@ body {
 
 .preview-area {
   height: 100%;
-  white-space: normal;
+  white-space: pre;
+  word-wrap: break-word;
   overflow-y: auto;
 }
 
