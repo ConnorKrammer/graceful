@@ -39,29 +39,9 @@
     });
   }
 
-  /**
-   * Detects a suitable mode from a filepath.
-   *
-   * If unable to detect a mode, the default is fetched from
-   * application preferences.
-   *
-   * @param {String} filepath - The path to detect the mode from.
-   * @param {String} key - The preference key to fetch the mode from.
-   * @return {Object} The detected mode object.
-   */
-   function detectMode(filepath, key) {
-    var index, filetype;
-
-    if (filepath) {
-      index    = filepath.lastIndexOf('.');
-      filetype = filepath.substr(index + 1);
-    } else {
-      filetype = 'default';
-    }
-
-    return Preferences.get('filetypes.' + filetype + '.' + key) ||
-      Preferences.get('filetypes.default.' + key);
-  };
+/* =======================================================
+ *                         Buffer
+ * ======================================================= */
 
   /**
    * The Buffer class.
@@ -170,6 +150,34 @@
   };
 
   /**
+   * Detects a suitable mode from a filepath.
+   *
+   * If unable to detect a mode, the default is fetched from
+   * application preferences.
+   *
+   * @param {String} filepath - The path to detect the mode from.
+   * @param {String} key - The preference key to fetch the mode from.
+   * @return {Object} The detected mode object.
+   */
+   function detectMode(filepath, key) {
+    var index, filetype;
+
+    if (filepath) {
+      index    = filepath.lastIndexOf('.');
+      filetype = filepath.substr(index + 1);
+    } else {
+      filetype = 'default';
+    }
+
+    return Preferences.get('filetypes.' + filetype + '.' + key) ||
+      Preferences.get('filetypes.default.' + key);
+  };
+
+/* =======================================================
+ *                       StatusLight
+ * ======================================================= */
+
+  /**
    * The StatusLight class.
    *
    * Manages the visual aspects of linking two panes, namely the handlers on the click
@@ -250,101 +258,6 @@
     this.linkBar.appendChild(this.linkLight);
 
     return this;
-  }
-
-  /**
-   * Adds an element to another element and fades it in from transparent.
-   * The fade will be for the given duration, and with the specified easing
-   * function. Note that the easing function must be CSS-compliant.
-   *
-   * @param {Element} parentElement - The element to add the transitioned element to.
-   * @param {Element} element - The element to fade in.
-   * @param {Number} duration - The duration, in milliseconds, of the fade.
-   * @param {String} easing - The easing function to use for the transition.
-   */
-  function fadeIn(parentElement, element, duration, easing) {
-    element.style.opacity = 0;
-    element.style.transition = 'opacity ' + duration + 'ms ' + easing;
-    
-    parentElement.appendChild(element);
-    element.offsetHeight; // Force reflow.
-    element.style.opacity = 1;
-
-    element.removeEventListener('transitionend', finishFadeOut);
-    element.addEventListener('transitionend', finishFadeIn);
-  }
-
-  /**
-   * Completes the fade-in effect started by fadeIn().
-   *
-   * @param {TransitionEvent} event - The transitionend event to handle.
-   */
-  function finishFadeIn(event) {
-    var target = event.target;
-
-    target.style.opacity = '';
-    target.style.transition = '';
-    target.removeEventListener('transitionend', finishFadeIn);
-  }
-
-  /**
-   * Fades an element out for the given duration, with the specified
-   * easing. Note that the easing function must be CSS-compliant.
-   *
-   * @param {Element} element - The element to fade out.
-   * @param {Number} duration - The duration, in milliseconds, of the fade.
-   * @param {String} easing - The easing function to use for the transition.
-   */
-  function fadeOut(element, duration, easing) {
-    element.style.opacity = 0;
-    element.style.transition = 'opacity ' + duration + 'ms ' + easing;
-
-    element.removeEventListener('transitionend', finishFadeIn);
-    element.addEventListener('transitionend', finishFadeOut);
-  }
-
-  /**
-   * Completes the fade-out effect started by fadeOut(), and removes
-   * the element.
-   *
-   * @param {TransitionEvent} event - The transitionend event to handle.
-   */
-  function finishFadeOut(event) {
-    var target = event.target;
-
-    target.style.opacity = '';
-    target.style.transition = '';
-    target.parentNode.removeChild(target);
-    target.removeEventListener('transitionend', finishFadeOut);
-  }
-
-  /**
-   * Resizes and rotates an element so that it stretches between the specified points.
-   *
-   * @param {Element} line - The element to use.
-   *
-   * @param {Object} origin - The start point of the line in screen coordinates.
-   * @param {Number} origin.x - The x position of the origin.
-   * @param {Number} origin.y - The y position of the origin.
-   *
-   * @param {Object} destination - The end point of the line in screen coordinates.
-   * @param {Number} destination.x - The x position of the destination.
-   * @param {Number} destination.y - The y position of the destination.
-   */
-  function drawLine(line, origin, destination) {
-    // Get the length of the line.
-    var length = Math.sqrt((destination.x - origin.x) * (destination.x - origin.x) +
-                           (destination.y - origin.y) * (destination.y - origin.y));
-
-    // Calculate the angle.
-    var angle = 180 / 3.1415 * Math.acos((destination.y - origin.y) / length);
-    if (destination.x > origin.x) angle *= -1;
-
-    // Draw the line from the source to the destination.
-    line.style.height = length - 8 + 'px';
-    line.style.top    = origin.y + 'px';
-    line.style.left   = origin.x + 'px';
-    line.style.webkitTransform = 'rotate(' + angle + 'deg)';
   }
 
   /**
@@ -463,6 +376,105 @@
   };
 
   /**
+   * Adds an element to another element and fades it in from transparent.
+   * The fade will be for the given duration, and with the specified easing
+   * function. Note that the easing function must be CSS-compliant.
+   *
+   * @param {Element} parentElement - The element to add the transitioned element to.
+   * @param {Element} element - The element to fade in.
+   * @param {Number} duration - The duration, in milliseconds, of the fade.
+   * @param {String} easing - The easing function to use for the transition.
+   */
+  function fadeIn(parentElement, element, duration, easing) {
+    element.style.opacity = 0;
+    element.style.transition = 'opacity ' + duration + 'ms ' + easing;
+    
+    parentElement.appendChild(element);
+    element.offsetHeight; // Force reflow.
+    element.style.opacity = 1;
+
+    element.removeEventListener('transitionend', finishFadeOut);
+    element.addEventListener('transitionend', finishFadeIn);
+  }
+
+  /**
+   * Completes the fade-in effect started by fadeIn().
+   *
+   * @param {TransitionEvent} event - The transitionend event to handle.
+   */
+  function finishFadeIn(event) {
+    var target = event.target;
+
+    target.style.opacity = '';
+    target.style.transition = '';
+    target.removeEventListener('transitionend', finishFadeIn);
+  }
+
+  /**
+   * Fades an element out for the given duration, with the specified
+   * easing. Note that the easing function must be CSS-compliant.
+   *
+   * @param {Element} element - The element to fade out.
+   * @param {Number} duration - The duration, in milliseconds, of the fade.
+   * @param {String} easing - The easing function to use for the transition.
+   */
+  function fadeOut(element, duration, easing) {
+    element.style.opacity = 0;
+    element.style.transition = 'opacity ' + duration + 'ms ' + easing;
+
+    element.removeEventListener('transitionend', finishFadeIn);
+    element.addEventListener('transitionend', finishFadeOut);
+  }
+
+  /**
+   * Completes the fade-out effect started by fadeOut(), and removes
+   * the element.
+   *
+   * @param {TransitionEvent} event - The transitionend event to handle.
+   */
+  function finishFadeOut(event) {
+    var target = event.target;
+
+    target.style.opacity = '';
+    target.style.transition = '';
+    target.parentNode.removeChild(target);
+    target.removeEventListener('transitionend', finishFadeOut);
+  }
+
+  /**
+   * Resizes and rotates an element so that it stretches between the specified points.
+   *
+   * @param {Element} line - The element to use.
+   *
+   * @param {Object} origin - The start point of the line in screen coordinates.
+   * @param {Number} origin.x - The x position of the origin.
+   * @param {Number} origin.y - The y position of the origin.
+   *
+   * @param {Object} destination - The end point of the line in screen coordinates.
+   * @param {Number} destination.x - The x position of the destination.
+   * @param {Number} destination.y - The y position of the destination.
+   */
+  function drawLine(line, origin, destination) {
+    // Get the length of the line.
+    var length = Math.sqrt((destination.x - origin.x) * (destination.x - origin.x) +
+                           (destination.y - origin.y) * (destination.y - origin.y));
+
+    // Calculate the angle.
+    var angle = 180 / 3.1415 * Math.acos((destination.y - origin.y) / length);
+    if (destination.x > origin.x) angle *= -1;
+
+    // Draw the line from the source to the destination.
+    line.style.height = length - 8 + 'px';
+    line.style.top    = origin.y + 'px';
+    line.style.left   = origin.x + 'px';
+    line.style.webkitTransform = 'rotate(' + angle + 'deg)';
+  }
+
+/* =======================================================
+ *                         Pane
+ * ======================================================= */
+
+  /**
    * The Pane base class.
    *
    * Panes are responsible for managing Buffer objects in various ways and displaying
@@ -477,20 +489,24 @@
    *       subclasses, where that argument is omitted.
    *
    * @constructor
+   * @param {Editor} editor - The editor that the pane belongs to.
    * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
    * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
    * @param {String} [type='base'] - The type of pane. Parameter only used by subclasses.
    */
-  function Pane(buffer, wrapper, type) {
+  function Pane(editor, buffer, wrapper, type) {
     var _this = this;
 
     // Mix in event handling.
     Observable(this);
 
     // Defaults.
-    buffer = buffer || new Buffer();
+    buffer  = buffer  || new Buffer();
     wrapper = wrapper || document.createElement('div');
-    type = type || 'base';
+    type    = type    || 'base';
+
+    // Keep a reference to the editor.
+    this.editor = editor;
 
     // Set type.
     this.type = type;
@@ -523,11 +539,36 @@
     // Add the info bar to the wrapper.
     this.wrapper.appendChild(this.infoBar);
 
+    // Add the command bar.
+    this.commandBar = new CommandBar(this);
+
+    // Toggle the command bar with ESC. Opens it if it's closed,
+    // focuses it if it's unfocused, and runs the commands otherwise.
+    this.wrapper.addEventListener('keydown', function(event) {
+      // Only proceed on ESC keypress.
+      if (event.keyCode !== 27) return;
+      event.stopPropagation();
+
+      if (!_this.commandBar.isOpen) {
+        _this.commandBar.toggle();
+      } else {
+        if (!_this.focuses['commandBarFocus']) {
+          _this.commandBar.focus();
+        } else {
+          _this.commandBar.runCommands();
+          _this.commandBar.toggle();
+        }
+      }
+    });
+
     // Set the buffer.
     this.switchBuffer(buffer);
 
     // The pane shouldn't be anchored by default.
     this.isAnchored = false;
+
+    // Keep an array of all panes linked to this one.
+    this.linkingPanes = [];
 
     // Allow pane linking.
     this.wrapper.addEventListener('link', this.linkHandler.bind(this));
@@ -553,6 +594,17 @@
   Pane.prototype.postInitialize = function() {};
 
   /**
+   * Sets the focus state on the given focus trigger.
+   *
+   * @param {String} focus - The focus trigger to set.
+   * @param {Boolean} isFocused - The state of the focus trigger.
+   */
+  Pane.prototype.setFocus = function(focus, isFocused) {
+    this.focuses[focus] = isFocused;
+    this.updateFocusState();
+  }
+
+  /**
    * Responsible for registering focus and blur handlers.
    * Meant to be overridden by subclasses.
    *
@@ -561,17 +613,14 @@
   Pane.prototype.registerFocusHandlers = function() {
     var _this = this;
 
-    // Set initial focus to false.
-    this.focuses.paneFocus = false;
-
+    // Track focus event.
     this.wrapper.addEventListener('focus', function() {
-      _this.focuses.paneFocus = true;
-      _this.updateFocusState();
+      _this.setFocus('paneFocus', true);
     });
 
+    // Track blur event.
     this.wrapper.addEventListener('blur', function() {
-      _this.focuses.paneFocus = false;
-      _this.updateFocusState();
+      _this.setFocus('paneFocus', false);
     });
   };
 
@@ -600,7 +649,7 @@
   };
 
   /**
-   * On overrideable method to set focus on the pane.
+   * An overrideable method to set focus on the pane.
    */
   Pane.prototype.focus = function() {
     this.wrapper.focus();
@@ -671,8 +720,8 @@
    * @return {Boolean} False if a circular reference would be created, otherwise true.
    */
   Pane.prototype.linkToPane = function(pane) {
-    // Prevent linking to self.
-    if (pane === this) return false;
+    // Prevent linking to self or the same pane.
+    if (pane && (pane === this || pane === this.linkedPane)) return false;
 
     // Prevent circular event loops.
     if (pane && pane.linkedPane) {
@@ -681,9 +730,11 @@
       }
     }
 
-    // Remove event handlers from old linked pane.
+    // Remove event handlers from old linked pane, and remove
+    // this pane from the linked pane's list of linking panes.
     if (this.linkedPane) {
       this.linkedPane.off(this.linkID);
+      this.linkedPane.removeLinkingPane(this);
     }
 
     if (pane) {
@@ -698,6 +749,9 @@
       this.linkID = pane.on('changeBuffer', function(newBuffer) {
         _this.switchBuffer(newBuffer);
       });
+
+      // Let the pane know this pane is linking to it.
+      pane.addLinkingPane(this);
     } else {
       // Make the pane cycleable again.
       this.isAnchored = true;
@@ -715,8 +769,39 @@
     return true;
   };
 
+  /**
+   * Unlinks all panes linked to this one.
+   */
+  Pane.prototype.unlinkAllPanes = function() {
+    _.forEach(this.linkingPanes, function(pane) {
+      pane.linkToPane(false);
+    });
+  };
+
+  /**
+   * Tracks the given pane as being linked to this one.
+   *
+   * @param {Pane} pane - The pane to track.
+   */
+  Pane.prototype.addLinkingPane = function(pane) {
+    this.linkingPanes.push(pane);
+  };
+
+  /**
+   * Stops tracking the given pane as being linked to this one.
+   *
+   * @param {Pane} pane - The pane to stop tracking.
+   */
+  Pane.prototype.removeLinkingPane = function(pane) {
+    this.linkingPanes.splice(this.linkingPanes.indexOf(this), 1);
+  };
+
+/* =======================================================
+ *                       InputPane
+ * ======================================================= */
+
   // Inherit from Pane.
-  InputPane.prototype = new Pane();
+  InputPane.prototype = Object.create(Pane.prototype);
   InputPane.prototype.constructor = Pane;
 
   /**
@@ -728,11 +813,12 @@
    * see {@link http://codemirror.net//doc/manual.html#config|here}.
    *
    * @constructor
+   * @param {Editor} editor - The editor that the pane belongs to.
    * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
    * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
    * @param {Object} [editorConfig] - A configuration object to pass to the CodeMirror constructor.
    */
-  function InputPane(buffer, wrapper, editorConfig) {
+  function InputPane(editor, buffer, wrapper, editorConfig) {
     // Merge in defaults with the supplied configuration.
     editorConfig = _.merge({
       lineWrapping: true,
@@ -743,10 +829,10 @@
     wrapper = wrapper || document.createElement('div');
     
     // Create the editor.
-    this.editor = CodeMirror(wrapper, editorConfig);
+    this.cm = CodeMirror(wrapper, editorConfig);
 
     // Inherit from Pane.
-    return Pane.call(this, buffer, wrapper, 'input');
+    return Pane.call(this, editor, buffer, wrapper, 'input');
   }
 
   /**
@@ -758,7 +844,7 @@
    * @param {String|Object} mode The mode for the editor.
    */
   InputPane.prototype.setMode = function(mode) {
-    this.editor.setOption('mode', mode);
+    this.cm.setOption('mode', mode);
   };
 
   /**
@@ -767,17 +853,14 @@
   InputPane.prototype.registerFocusHandlers = function() {
     var _this = this;
     
-    // Set initial focus to false.
-    this.focuses.inputFocus = false;
-
-    this.editor.on('focus', function() {
-      _this.focuses.inputFocus = true;
-      _this.updateFocusState();
+    // Track focus event.
+    this.cm.on('focus', function() {
+      _this.setFocus('inputFocus', true);
     });
 
-    this.editor.on('blur', function() {
-      _this.focuses.inputFocus = false;
-      _this.updateFocusState();
+    // Track blur event.
+    this.cm.on('blur', function() {
+      _this.setFocus('inputFocus', false);
     });
 
     Pane.prototype.registerFocusHandlers.call(this);
@@ -787,7 +870,7 @@
    * Overrides Pane.focus().
    */
   InputPane.prototype.focus = function() {
-    this.editor.focus();
+    this.cm.focus();
   };
 
   /**
@@ -802,8 +885,8 @@
     var _this = this;
 
     this.doc = buffer.getLink();
-    this.editor.swapDoc(this.doc);
-    this.editor.refresh();
+    this.cm.swapDoc(this.doc);
+    this.cm.refresh();
 
     // Remove old event listeners.
     if (typeof this.filetypeChangeID !== 'undefined') {
@@ -821,8 +904,12 @@
     return Pane.prototype.switchBuffer.call(this, buffer, breakLink);
   };
 
+/* =======================================================
+ *                      PreviewPane
+ * ======================================================= */
+
   // Inherit from Pane.
-  PreviewPane.prototype = new Pane();
+  PreviewPane.prototype = Object.create(Pane.prototype);
   PreviewPane.prototype.constructor = Pane;
 
   /**
@@ -831,11 +918,12 @@
    * Preview panes are used to parse and display buffer contents.
    *
    * @constructor
+   * @param {Editor} editor - The editor that the pane belongs to.
    * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
    * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
    * @param {Function} [parse] - The parsing function, which accepts a string as input and returns it parsed.
    */
-  function PreviewPane(buffer, wrapper, parse) {
+  function PreviewPane(editor, buffer, wrapper, parse) {
     // The preview function.
     this.parse = parse || detectMode(buffer.filepath, previewModeKey);
 
@@ -845,7 +933,7 @@
     wrapper.appendChild(this.previewArea);
 
     // Inherit from Pane.
-    return Pane.call(this, buffer, wrapper, 'preview');
+    return Pane.call(this, editor, buffer, wrapper, 'preview');
   }
 
   /**
@@ -891,6 +979,10 @@
     this.previewArea.innerHTML = this.parse(buffer.text);
   };
 
+/* =======================================================
+ *                        Editor
+ * ======================================================= */
+
   /**
    * The Editor class.
    *
@@ -902,28 +994,13 @@
    * @param {String} containerID - The id of the element to insert the editor into.
    */
   function Editor(containerID) {
-    var _this = this;
-
-    // Get the container and start with 
+    // Get the editor's container and start with no panes.
     this.container = document.getElementById('editor');
     this.panes = [];
 
     // Command-related properties.
-    this.commands = [];
+    this.commandDictionary = {};
     this.commandHistory = [];
-
-    // Toggle the command bar with ESC.
-    this.container.addEventListener('keydown', function(event) {
-      // Only proceed on ESC keypress.
-      if (event.keyCode !== 27) return;
-
-      // Create the command bar if it doesn't exist.
-      if (!_this.commandBar) {
-        _this.openCommandBar();
-      } else {
-        _this.closeCommandBar();
-      }
-    });
 
     return this;
   }
@@ -935,18 +1012,23 @@
    */
   Editor.prototype.init = function() {
     // Add the test panes.
-    var input = this.addPane(InputPane, new Buffer(), 'horizontal');
-    var preview = this.addPane(PreviewPane, new Buffer(), 'horizontal');
+    var input = this.addPane(InputPane, null, 'horizontal');
+    var preview = this.addPane(PreviewPane, null, 'horizontal');
   };
 
   /**
    * Adds a new pane. If the type is set to 'vertical', then the pane will be
    * inserted into the same vertical compartment as parentPane.
    *
+   * Note that the editor parameter can be omitted from the arguments to pass to
+   * the pane constructor, or can be stated explictly.
+   *
    * @todo Add the new pane immediately after the parent pane.
    * @todo Contemplate whether or not to emulate vim's behaviour, in that a pane
    *       taking up approximately > 80% of the screen's width/height will be
    *       partitioned in half without effecting any other panes.
+   * @todo Create a cleaner method for passing in the arguments to the pane's
+   *       constructor.
    *
    * @param {Function} constructor - The constructor of the pane type to add.
    * @param {Array} args - An array of arguments, to be passed in order to the constructor.
@@ -964,8 +1046,14 @@
     // Keep a reference to the focus pane, since a vertical split could de-focus it.
     focusPane = this.getFocusPane();
 
+    // Add the editor as the first argument if not passed.
+    if (args[0] !== this) args.unshift(this);
+
+    // Default the buffer.
+    args[1] = args[1] || new Buffer();
+
     // The wrapper is needed before the pane is created, so get a smart default.
-    wrapper = args[1] = args[1] || document.createElement('div');
+    wrapper = args[2] = args[2] || document.createElement('div');
 
     if (type === 'vertical' && parentPane) {
       if (parentPane.wrapper.parentNode.classList.contains('vertical-splitter-pane')) {
@@ -1013,8 +1101,8 @@
     // Vertical splits cause display issues.
     if (type === 'vertical') {
       _.forEach(this.panes, function(pane) {
-        if (pane.type === 'input') {
-          pane.editor.refresh();
+        if (pane instanceof InputPane) {
+          pane.cm.refresh();
         }
       });
     }
@@ -1035,6 +1123,7 @@
     var sibling          = pane.wrapper.previousElementSibling || pane.wrapper.nextElementSibling;
     var containerParent  = container.parentElement;
     var containerSibling = container.previousElementSibling || container.nextElementSibling;
+    var newFocus;
 
     // Separate cases are needed for cases including vertical splitters.
     // For example, removing the last pane in a vertical split should also remove the split.
@@ -1044,10 +1133,15 @@
       && containerSibling.classList.contains('splitter');
 
     if (shouldRemovePane) {
+      // Remove the pane.
       container.removeChild(pane.wrapper);
       container.removeChild(sibling);
       this.panes.splice(this.panes.indexOf(pane), 1);
 
+      // Unlink all linking panes.
+      if (pane.linkingPanes) pane.unlinkAllPanes();
+
+      // Resize the remaining panes.
       if (sibling.classList.contains('horizontal')) {
         sizePanesEvenly(this, container, 'horizontal');
       } else {
@@ -1055,56 +1149,26 @@
       }
     }
     else if (shouldRemoveParent) {
+      // Remove the vertical split housing the pane.
       containerParent.removeChild(container);
       containerParent.removeChild(containerSibling);
       this.panes.splice(this.panes.indexOf(pane), 1);
 
+      // Unlink all linking panes.
+      if (pane.linkingPanes) pane.unlinkAllPanes();
+
+      // Resize the remaining panes.
       sizePanesEvenly(this, containerParent, 'horizontal');
     }
     else {
+      // It's the last pane, so just give it a new buffer.
       pane.switchBuffer(new Buffer());
     }
+
+    // Focus another pane.
+    newFocus = _.find(this.panes, { 'type': 'input' }) || this.panes[0];
+    newFocus.focus();
   };
-
-  /**
-   * Divides up the space evenly among panes in the given direction.
-   *
-   * @param {Editor} editor - The editor to resize panes from.
-   * @param {Element} container - The element containing the panes.
-   * @param {String} direction - The direction to resize the panes in.
-   */
-  function sizePanesEvenly(editor, container, direction) {
-    var children = container.children;
-    var paneCount = (children.length + 1) / 2;
-    var child;
-
-    // Iterate by 2's to avoid splitters.
-    for (var i = 0; i < children.length; i += 2) {
-      child = children[i];
-      if (direction === 'horizontal') {
-        child.style.width = (1 / paneCount * 100) + '%';
-        child.style.height = '';
-      } else {
-        child.style.height = (1 / paneCount * 100) + '%';
-        child.style.width = '';
-      }
-    }
-
-    // Trigger a resize event.
-    _.forEach(editor.panes, function(pane) {
-      pane.trigger('resize');
-    });
-
-    // Just use the last child, since the timing is the same for all of them.
-    child.addEventListener('transitionend', function(event) {
-      var property = (direction === 'horizontal') ? 'width' : 'height';
-      if (event.propertyName === property) {
-        _.forEach(editor.panes, function(pane) {
-          pane.trigger('resize');
-        });
-      }
-    });
-  }
 
   /**
    * Inserts a splitter into a container.
@@ -1335,6 +1399,86 @@
   };
 
   /**
+   * Returns the focused pane.
+   *
+   * @return {Pane|False} The focused pane, or false if no pane has focus.
+   */
+  Editor.prototype.getFocusPane = function() {
+    return _.find(this.panes, 'isFocused') || false;
+  };
+
+  /**
+   * Returns the pane with the specified element as a wrapper.
+   *
+   * @param {Element} element - The wrapper element to find the pane of.
+   * @return {Pane|False} The pane with the given wrapper, or false if no
+   *         pane has the wrapper specified.
+   */
+  Editor.prototype.getPaneByElement = function(element) {
+    return _.find(this.panes, function(pane) {
+      return pane.wrapper === element;
+    }) || false;
+  };
+
+  /**
+   * Defines a command. The parameters are just passed on to the Command constructor.
+   *
+   * @param {String} name - The name of the command.
+   * @param {Integer} argCount - The number of arguments the command function accepts.
+   * @param {Function} func - The function the command invokes.
+   * @param {String} delimeter - The delimeter between function arguments.
+   * @param {Boolean} forceLast - Whether the command should be pushed to the end
+   *        of the call list when several commands are run sequentially.
+   */
+  Editor.prototype.defineCommand = function(name, argCount, func, delimeter, forceLast) {
+    this.commandDictionary[name] = new Command(name, argCount, func, delimeter, forceLast);
+  };
+
+  /**
+   * Divides up the space evenly among panes in the given direction.
+   *
+   * @param {Editor} editor - The editor to resize panes from.
+   * @param {Element} container - The element containing the panes.
+   * @param {String} direction - The direction to resize the panes in.
+   */
+  function sizePanesEvenly(editor, container, direction) {
+    var children = container.children;
+    var paneCount = (children.length + 1) / 2;
+    var child;
+
+    // Iterate by 2's to avoid splitters.
+    for (var i = 0; i < children.length; i += 2) {
+      child = children[i];
+      if (direction === 'horizontal') {
+        child.style.width = (1 / paneCount * 100) + '%';
+        child.style.height = '';
+      } else {
+        child.style.height = (1 / paneCount * 100) + '%';
+        child.style.width = '';
+      }
+    }
+
+    // Trigger a resize event.
+    _.forEach(editor.panes, function(pane) {
+      pane.trigger('resize');
+    });
+
+    // Just use the last child, since the timing is the same for all of them.
+    child.addEventListener('transitionend', function(event) {
+      var property = (direction === 'horizontal') ? 'width' : 'height';
+      if (event.propertyName === property) {
+        _.forEach(editor.panes, function(pane) {
+          pane.trigger('resize');
+        });
+      }
+    });
+  }
+
+/* =======================================================
+ *                        Command
+ * ======================================================= */
+
+  /**
    * The Command class.
    *
    * Commands define a function and a method for parsing arguments
@@ -1359,21 +1503,10 @@
   }
 
   /**
-   * Defines a command. The parameters are just passed on to the Command constructor.
-   *
-   * @param {String} name - The name of the command.
-   * @param {Integer} argCount - The number of arguments the command function accepts.
-   * @param {Function} func - The function the command invokes.
-   * @param {String} delimeter - The delimeter between function arguments.
-   * @param {Boolean} forceLast - Whether the command should be pushed to the end
-   *        of the call list when several commands are run sequentially.
-   */
-  Editor.prototype.defineCommand = function(name, argCount, func, delimeter, forceLast) {
-    this.commands[name] = new Command(name, argCount, func, delimeter, forceLast);
-  };
-
-  /**
-   * Function that throws an error for an unrecognized command.
+   * Function that throws an error.
+   * Used by parseCommand() to construct a Command object that
+   * fails in a manner expected by runCommand(), for cases where
+   * the supplied string can't be parsed.
    */
   function failCommand() {
     throw new Error('Command not recognized.'); 
@@ -1384,30 +1517,31 @@
    * fetches the command from the editor's command hash.
    *
    * @param {String} input - The input command string.
+   * @param {Object} dictionary - A hash table mapping command names to Command objects.
    * @return {Array|False} An array with a Command instance in the first
    *         index, and an array of arguments to pass to the command
    *         in the second. A special command is returned if the input
    *         is unrecognized, and false is returned on blank input.
    */
-  Editor.prototype.parseCommand = function(input) {
+   function parseCommand(input, dictionary) {
     var name, command, args, index, ret, error;
 
     // Do nothing if the command is blank.
     if (input.trim() === '') return false;
 
-    // Parse out the name;
+    // Get the command.
     name = input.split(' ', 1).toString();
+    command = dictionary[name];
 
     // Return a failing command if command is unknown.
-    if (typeof this.commands[name] === 'undefined') {
+    if (typeof command === 'undefined') {
       return [new Command(name, 0, failCommand), null];
     }
 
     // Parse out the arguments.
-    index   = input.indexOf(' ');
-    input   = index !== -1 ? input.substr(index + 1) : '';
-    command = this.commands[name];
-    args    = input.split(command.delimeter);
+    index = input.indexOf(' ');
+    input = index !== -1 ? input.substr(index + 1) : '';
+    args  = input.split(command.delimeter);
 
     // If arguments are requested, add the remainder of the command
     // string to the final argument. If argCount < 0 then unlimited
@@ -1426,23 +1560,29 @@
 
     // Return the command.
     return [command, args];
-  };
+  }
 
   /**
-   * Run the specified command or array of commands. Commands can
-   * be passed in as either a string to be parsed (as from the
-   * command bar) or as an array of such strings.
+   * Run the specified command or array of commands. Commands can be passed in as
+   * either a string to be parsed (as from the command bar) or as an array of such strings.
    *
    * Note that if one of the commands fail, any following commands will be skipped.
    *
+   * @todo Allow command aliasing.
+   * @todo Allow the pane to be changed dynamically by certain commands (important for ones
+   *       that might add or remove panes). Implementation should take the pane argument
+   *       as a function that would return the proper pane to execute on.
+   * @todo Emphasize somewhere that there must be a focused pane at all times.
+   *
    * @param {String|String[]} list - A command string to parse, or an array of command strings.
+   * @param {Object} dictionary - A hash table mapping command names to Command objects.
    * @param {Pane} pane - The pane to run the commands on.
-   * @param {boolean} [saveToHistory=false] - Whether to keep a record of the command(s) run.
+   * @param {Object[]} [history] - An array of history objects to append the run results to.
    */
-  Editor.prototype.runCommand = function(list, pane, saveToHistory) {
+   function runCommand(list, dictionary, pane, history) {
     // Parse out an array of commands from the list.
     var commands = _([].concat(list))
-      .map(   function(string)  { return this.parseCommand(string); }, this)
+      .map(   function(string)  { return parseCommand(string, dictionary); })
       .filter(function(results) { return typeof results[0] !== 'undefined'; })
       .sortBy(function(results) { return results[0].forceLast ? 1 : 0; })
       .value();
@@ -1454,7 +1594,7 @@
     var failHard = false;
 
     // Save a record of the commands if requested.
-    if (saveToHistory || false) this.commandHistory.push(historyItem);
+    if (history) history.push(historyItem);
       
     // Run through the commands in order.
     _.reduce(commands, function(promiseChain, commandInfo, index) {
@@ -1493,34 +1633,32 @@
         failHard = true;
       });
     }, null);
-  };
+   }
+
+/* =======================================================
+ *                      CommandBar
+ * ======================================================= */
 
   /**
-   * Opens up a command bar in the currently focused pane.
+   * The CommandBar class.
    *
-   * @todo Refactor command bar methods into a CommandBar class.
+   * This class is responsible for accepting typed commands
+   * from a user and parsing the into Command objects and a
+   * set of matching arguments.
+   *
+   * @constructor
+   * @param {Pane} pane - The pane to add this command bar to.
    */
-  Editor.prototype.openCommandBar = function() {
-    var pane       = this.getFocusPane();
-    var commandBar = document.createElement('div');
-
-    // Do nothing if no pane is focused.
-    if (!pane) return;
+  function CommandBar(pane) {
+    var element = document.createElement('div');
+    var _this = this;
 
     // Set the class name and make its contents editable.
-    commandBar.className = 'command-bar';
-    commandBar.setAttribute('contentEditable', true);
-
-    // Add the command bar.
-    pane.wrapper.appendChild(commandBar);
-    commandBar.focus();
-
-    // Maintain the focus on the pane.
-    pane.focuses.commandBarFocus = true;
-    pane.updateFocusState();
+    element.className = 'command-bar';
+    element.setAttribute('contentEditable', true);
 
     // Make the contentEditable div act like a resizable textarea.
-    commandBar.addEventListener('keydown', function(event) {
+    element.addEventListener('keydown', function(event) {
       // Create the <br> element and get the selection and range.
       var newline   = document.createElement('br');
       var selection = window.getSelection();
@@ -1546,66 +1684,122 @@
       // Keep a <br> element at the end of the command bar. Fixes a problem where
       // the enter key needs to be hit twice to insert a newline when the cursor is 
       // at the end of the input.
-      if (commandBar.lastChild && commandBar.lastChild.nodeName !== 'BR') {
-        commandBar.appendChild(document.createElement('br'));
+      if (element.lastChild && element.lastChild.nodeName !== 'BR') {
+        element.appendChild(document.createElement('br'));
       }
     });
 
-    // Keep a reference to the command bar.
-    this.commandBar = commandBar;
-    this.commandPane = pane;
+    // Set focus trigger.
+    element.addEventListener('focus', function() {
+      pane.setFocus('commandBarFocus', true);
+    });
+
+    // Close on blur if no content has been entered.
+    element.addEventListener('blur', function() {
+      if (!_this.hasText()) _this.close();
+      else pane.setFocus('commandBarFocus', false);
+    });
+
+    // Keep references.
+    this.pane       = pane;
+    this.element    = element;
+    this.dictionary = pane.editor.commandDictionary;
+    this.history    = pane.editor.commandHistory;
+
+    return this;
+  }
+
+  /**
+   * Opens up the command bar in the given pane.
+   */
+  CommandBar.prototype.open = function() {
+    // Exit if already open.
+    if (this.isOpen) return;
+    this.isOpen = true;
+
+    // Add the command bar element.
+    this.pane.wrapper.appendChild(this.element);
+    this.element.focus();
+
+    // Keep the focus on the pane.
+    this.pane.setFocus('commandBarFocus', true);
   };
 
   /**
-   * Closes the open command bar.
-   *
-   * @todo Fix edge case where any pane with a command bar still
-   *       has the 'focus' class even if the command bar isn't
-   *       focused.
-   *
-   * @todo Refactor command bar methods into a CommandBar class.
+   * Removes the command bar.
    */
-  Editor.prototype.closeCommandBar = function() {
-    var commandList;
+  CommandBar.prototype.close = function() {
+    var isFocused;
 
-    // Exit if the command bar is not open.
-    if (!this.commandBar) return;
+    // Exit if already closed.
+    if (!this.isOpen) return;
+    this.isOpen = false;
 
-    // Get the command bar text, and the focused pane.
-    commandList = this.commandBar.innerText.split(/\n+/);
+    // Close the command bar and refocus the pane if needed.
+    isFocused = this.pane.isFocused;
+    this.pane.wrapper.removeChild(this.element);
+    this.pane.setFocus('commandBarFocus', false);
+    if (isFocused) this.pane.focus();
 
-    // Remove the command bar.
-    this.commandBar.parentElement.removeChild(this.commandBar);
-    this.commandBar = null;
-
-    // Remove the command bar focus state and then refocus the pane.
-    this.commandPane.focuses.commandBarFocus = false;
-    this.commandPane.focus();
-
-    // Run all the commands.
-    this.runCommand(commandList, this.commandPane, true);
+    // Don't track the caret between open/close toggles.
+    this.caretPosition = false;
   };
 
   /**
-   * Returns the focused pane.
-   *
-   * @return {Pane|False} The focused pane, or false if no pane has focus.
+   * Toggles the command bar.
    */
-  Editor.prototype.getFocusPane = function() {
-    return _.find(this.panes, 'isFocused') || false;
+  CommandBar.prototype.toggle = function() {
+    if (this.isOpen) this.close();
+    else this.open();
   };
 
   /**
-   * Returns the pane with the specified element as a wrapper.
-   *
-   * @param {Element} element - The wrapper element to find the pane of.
-   * @return {Pane|False} The pane with the given wrapper, or false if no
-   *         pane has the wrapper specified.
+   * Focuses the command bar and moves the cursor to the end of the
+   * input area.
    */
-  Editor.prototype.getPaneByElement = function(element) {
-    return _.find(this.panes, function(pane) {
-      return pane.wrapper === element;
-    }) || false;
+  CommandBar.prototype.focus = function() {
+    var range, selection;
+
+    // Only do this if the command bar is open.
+    if (!this.isOpen) return;
+
+    // Focus the bar.
+    this.element.focus();
+
+    // Moves the cursor to the end of the input.
+    range = document.createRange();
+    range.selectNodeContents(this.element);
+    range.collapse(false);
+    selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
+  /**
+   * Parses input into Command objects and runs them with the supplied 
+   * arguments. Commands are looked up in the command dictionary, and
+   * the run result of each command is recorded in the history array.
+   */
+  CommandBar.prototype.runCommands = function() {
+    // Exit if there isn't any text entered.
+    if (!this.hasText()) return;
+
+    // Run each line of text as a command.
+    var commands = this.element.innerText.split(/\n+/);
+    runCommand(commands, this.dictionary, this.pane, this.history);
+
+    // Clear the entered text.
+    this.element.innerText = '';
+  };
+
+  /**
+   * Returns whether there is text entered in the input area or not.
+   * Whitespace is not counted.
+   *
+   * @return {Boolean} Whether or not the command bar contains text.
+   */
+  CommandBar.prototype.hasText = function() {
+    return this.element.innerText.replace(/\s+/g, '') !== '';
   };
 
   // Expose globals.
