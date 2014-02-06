@@ -1435,13 +1435,11 @@
    *
    * Note that if one of the commands fail, any following commands will be skipped.
    *
-   * @todo Allow the specification of the target pane. The target pane should be
-   *       passed as the first argument to the command's function.
-   *
    * @param {String|String[]} list - A command string to parse, or an array of command strings.
+   * @param {Pane} pane - The pane to run the commands on.
    * @param {boolean} [saveToHistory=false] - Whether to keep a record of the command(s) run.
    */
-  Editor.prototype.runCommand = function(list, saveToHistory) {
+  Editor.prototype.runCommand = function(list, pane, saveToHistory) {
     // Parse out an array of commands from the list.
     var commands = _([].concat(list))
       .map(   function(string)  { return this.parseCommand(string); }, this)
@@ -1461,7 +1459,7 @@
     // Run through the commands in order.
     _.reduce(commands, function(promiseChain, commandInfo, index) {
       var command = commandInfo[0];
-      var args = commandInfo[1];
+      var args = [pane].concat(commandInfo[1]);
 
       // Wait for any returned promises to resolve before continuing.
       return Q.when(promiseChain, function() {
@@ -1568,7 +1566,7 @@
    * @todo Refactor command bar methods into a CommandBar class.
    */
   Editor.prototype.closeCommandBar = function() {
-    var commandList, pane;
+    var commandList;
 
     // Exit if the command bar is not open.
     if (!this.commandBar) return;
@@ -1585,7 +1583,7 @@
     this.commandPane.focus();
 
     // Run all the commands.
-    this.runCommand(commandList, true);
+    this.runCommand(commandList, this.commandPane, true);
   };
 
   /**

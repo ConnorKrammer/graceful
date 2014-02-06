@@ -24,23 +24,25 @@
    *
    * @todo Allow a more intuitive way to specify the linked pane.
    *
+   * @param {Editor.Pane} pane - The pane to link.
    * @param {Integer) paneNumber - The index of the pane to create the link with.
    */
-  graceful.editor.defineCommand('link', 1, function(paneNumber) {
+  graceful.editor.defineCommand('link', 1, function(pane, paneNumber) {
     paneNumber = parseInt(paneNumber, 10);
-    graceful.editor.getFocusPane().linkToPane(graceful.editor.panes[paneNumber]);
+    pane.linkToPane(graceful.editor.panes[paneNumber]);
   });
 
   /**
    * Add a split pane to the editor.
    *
+   * @param {Editor.Pane} pane - The pane to use for the command.
    * @param {String} direction - The direction to make the split in.
    * @param {String} type - The type of pane to add.
    * @param {Boolean} link - Whether to link the new pane to
    *        the pane executing the command.
    * @return {Promise} A promise for the split.
    */
-  function addSplit(direction, type, link) {
+  function addSplit(pane, direction, type, link) {
     type = type.toLowerCase();
 
     // Set pane type.
@@ -49,22 +51,23 @@
     else                         type = Editor.InputPane;
 
     // Add the pane.
-    var deferred  = Q.defer();
-    var focusPane = graceful.editor.getFocusPane();
-    var buffer    = new Editor.Buffer();
-    var pane      = graceful.editor.addPane(type, buffer, direction, focusPane);
-    var property  = direction === 'vertical' ? 'height' : 'width';
+    var deferred = Q.defer();
+    var newPane  = graceful.editor.addPane(type, new Editor.Buffer(), direction, pane);
+    var property = direction === 'vertical' ? 'height' : 'width';
 
     // Link the pane.
-    if (link) pane.linkToPane(focusPane);
+    if (link) newPane.linkToPane(pane);
 
     // Allow the transition to finish before subsequent commands can start.
-    focusPane.wrapper.addEventListener('transitionend', function endListener(event) {
+    pane.wrapper.addEventListener('transitionend', function endListener(event) {
       if (event.propertyName === property) {
         deferred.resolve();
-        focusPane.wrapper.removeEventListener('transitionend', endListener);
+        pane.wrapper.removeEventListener('transitionend', endListener);
       }
     });
+
+    // Re-focus the pane.
+    pane.focus();
 
     return deferred.promise;
   }
@@ -72,25 +75,27 @@
   /**
    * Open up a new horizontal split pane.
    *
+   * @param {Editor.Pane} pane - The pane to use for the command.
    * @param {String} type - The type of pane to add.
    * @param {Boolean} link - Whether to link the new pane to
    *        the pane executing the command.
    * @return {Promise} A promise for the split.
    */
-  graceful.editor.defineCommand('split_h', 2, function(type, link) {
-    return addSplit('horizontal', type, link);
+  graceful.editor.defineCommand('split_h', 2, function(pane, type, link) {
+    return addSplit(pane, 'horizontal', type, link);
   });
 
   /**
    * Open up a new vertical split pane.
    *
+   * @param {Editor.Pane} pane - The pane to use for the command.
    * @param {String} type - The type of pane to add.
    * @param {Boolean} link - Whether to link the new pane to
    *        the pane executing the command.
    * @return {Promise} A promise for the split.
    */
-  graceful.editor.defineCommand('split_v', 2, function(type, link) {
-    return addSplit('vertical', type, link);
+  graceful.editor.defineCommand('split_v', 2, function(pane, type, link) {
+    return addSplit(pane, 'vertical', type, link);
   });
 
   /**
@@ -113,18 +118,20 @@
 
   /**
    * Closes the focused pane.
+   *
+   * @param {Editor.Pane} pane - The pane to use remove.
    */
-  graceful.editor.defineCommand('close', 0, function() {
-    var focusPane = graceful.editor.getFocusPane();
-    graceful.editor.removePane(focusPane);
+  graceful.editor.defineCommand('close', 0, function(pane) {
+    graceful.editor.removePane(pane);
   });
 
   /**
-   * Define an open command.
+   * Opens a file into the given pane.
    * 
    * When calling this command on a pane that is linked to another pane,
    * the link will be broken. This is due to the one-way nature of the link.
    *
+   * @param {Editor.pane} pane - The pane to open the file in.
    * @param {String} path - The path to open. If not specified,
    *        the user will be prompted to choose a destination. If
    *        the buffer has a filepath associated with it, the path
@@ -132,9 +139,8 @@
    *
    * @return {Promise} A promise for the open operation.
    */
-  graceful.editor.defineCommand('open', 1, function(path) {
-    var focusPane  = graceful.editor.getFocusPane();
-    var buffer     = focusPane.buffer;
+  graceful.editor.defineCommand('open', 1, function(pane, path) {
+    var buffer = pane.buffer;
     var firstChars;
 
     // Make non-absolute filepaths relative to the buffer's filepath.
@@ -164,7 +170,7 @@
           // If it's an existing file, open it.
           return FileSystem.readFile(path)
         .then(function(contents) {
-          focusPane.switchBuffer(new Editor.Buffer(contents, path), true);
+          pane.switchBuffer(new Editor.Buffer(contents, path), true);
         });
         }
         else if (type === 'directory') {
@@ -173,7 +179,7 @@
         .then(function(selection) {
           return FileSystem.readFile(selection)
           .then(function(contents) {
-            focusPane.switchBuffer(new Editor.Buffer(contents, selection), true);
+            pane.switchBuffer(new Editor.Buffer(contents, selection), true);
           });
         })
         }
@@ -183,7 +189,7 @@
             .then(function(selection) {
               return FileSystem.readFile(selection)
               .then(function(contents) {
-                focusPane.switchBuffer(new Editor.Buffer(contents, selection), true);
+                pane.switchBuffer(new Editor.Buffer(contents, selection), true);
               });
             });
         }
@@ -191,8 +197,9 @@
   });
 
   /**
-   * Define a save command.
+   * Saves the content of the given pane.
    *
+   * @param {Editor.pane} pane - The pane to open the file in.
    * @param {String} path - The path to save to. If not specified,
    *        the user will be prompted to choose a destination. If
    *        the buffer has a filepath associated with it, the path
@@ -200,9 +207,8 @@
    *
    * @return {Promise} A promise for the save operation.
    */
-  graceful.editor.defineCommand('save', 1, function(path) {
-    var focusPane  = graceful.editor.getFocusPane();
-    var buffer     = focusPane.buffer;
+  graceful.editor.defineCommand('save', 1, function(pane, path) {
+    var buffer     = pane.buffer;
     var firstChars = path.substr(0, 2);
     var lastChar   = path.substr(-1);
 
