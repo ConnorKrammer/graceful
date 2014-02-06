@@ -114,7 +114,7 @@
     });
 
     Utils.DEBUG_VERBOSE = Preferences.get('extensions.core.utils.debug.enabled');
-    Utils.DEBUG_VERBOSE = Preferences.get('extensions.core.utils.debug.verbosity');
+    Utils.DEBUG_VERBOSE = Preferences.get('extensions.core.utils.debug.verbose');
   });
 
   // Expose globals.
