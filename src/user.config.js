@@ -36,11 +36,11 @@
    *
    * @param {String} direction - The direction to make the split in.
    * @param {String} type - The type of pane to add.
-   * @param {Boolean} duplicate - Whether to link the new pane to
+   * @param {Boolean} link - Whether to link the new pane to
    *        the pane executing the command.
    * @return {Promise} A promise for the split.
    */
-  function addSplit(direction, type, duplicate) {
+  function addSplit(direction, type, link) {
     type = type.toLowerCase();
 
     // Set pane type.
@@ -51,9 +51,12 @@
     // Add the pane.
     var deferred  = Q.defer();
     var focusPane = graceful.editor.getFocusPane();
-    var buffer    = duplicate ? focusPane.buffer : new Editor.Buffer();
+    var buffer    = new Editor.Buffer();
     var pane      = graceful.editor.addPane(type, buffer, direction, focusPane);
     var property  = direction === 'vertical' ? 'height' : 'width';
+
+    // Link the pane.
+    if (link) pane.linkToPane(focusPane);
 
     // Allow the transition to finish before subsequent commands can start.
     focusPane.wrapper.addEventListener('transitionend', function endListener(event) {
@@ -70,24 +73,24 @@
    * Open up a new horizontal split pane.
    *
    * @param {String} type - The type of pane to add.
-   * @param {Boolean} duplicate - Whether to link the new pane to
+   * @param {Boolean} link - Whether to link the new pane to
    *        the pane executing the command.
    * @return {Promise} A promise for the split.
    */
-  graceful.editor.defineCommand('split_h', 2, function(type, duplicate) {
-    return addSplit('horizontal', type, duplicate);
+  graceful.editor.defineCommand('split_h', 2, function(type, link) {
+    return addSplit('horizontal', type, link);
   });
 
   /**
    * Open up a new vertical split pane.
    *
    * @param {String} type - The type of pane to add.
-   * @param {Boolean} duplicate - Whether to link the new pane to
+   * @param {Boolean} link - Whether to link the new pane to
    *        the pane executing the command.
    * @return {Promise} A promise for the split.
    */
-  graceful.editor.defineCommand('split_v', 2, function(type, duplicate) {
-    return addSplit('vertical', type, duplicate);
+  graceful.editor.defineCommand('split_v', 2, function(type, link) {
+    return addSplit('vertical', type, link);
   });
 
   /**
