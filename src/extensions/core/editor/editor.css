@@ -256,6 +256,15 @@ body {
   z-index: 1000;
 }
 
+.link-line-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .link-line {
   position: absolute;
   width: 4px;
@@ -263,20 +272,55 @@ body {
   -webkit-transform-origin: center top;
   border-radius: 10px;
   box-shadow: 0px 0px 1px 0px rgba(0, 173, 255, 0.5); 
-  pointer-events: none;
   z-index: 1000000;
 }
 
-.link-line:after {
+.link-line:after,
+.link-line-display:before {
   content: "";
   position: absolute;
-  bottom: -16px;
-  right: -6px;
-  width: 16px;
-  height: 16px;
-  box-sizing: content-box;
+  right: -17px;
+  width: 38px;
+  height: 38px;
+  background-color: rgb(0, 173, 255);
   border-radius: 1000px;
-  box-shadow: 0px 0px 0px 13px rgba(0, 173, 255, 01);
+  border-width: 15px;
+  border-style: solid;
+  border-color: rgb(250, 250, 250);
+  box-shadow: 0px 0px 0px 2px rgb(0, 173, 255);
+  transition: border-width 300ms ease-in;
+}
+
+/* The end nodes of link lines with valid targets
+ * should be larger, as should those of link display
+ * lines. */
+.link-line-display:after,
+.link-line.valid-target:after {
+  border-width: 5px;
+}
+
+/* top and bottom: -(width / 2)
+ * right: -(width - linewidth) / 2 */
+.link-line:after {
+  bottom: -19px;
+}
+
+.link-line-display:not(:last-child):after {
+  bottom: -13px;
+}
+
+.link-line-display:before {
+  top: -13px;
+}
+
+/* All nodes except the end node of the last
+ * display line should be smaller. */
+.link-line-display:before,
+.link-line-display:not(:last-child):after {
+  width: 26px;
+  height: 26px;
+  right: -11px;
+  border-width: 10px;
 }
 
 .link-button {

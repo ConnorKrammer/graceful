@@ -183,7 +183,12 @@
    * Manages the visual aspects of linking two panes, namely the handlers on the click
    * and mousemove events, and the drawing of the link line to represent this action.
    *
+   * Note that the link line is the line drawn when attempting to make a link, and the
+   * link display line is the line drawn when showing an *existing* link.
+   *
    * For line drawing method, see {@link http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html|here}.
+   *
+   * @todo Tidy up event handling.
    * 
    * @constructor
    * @param {Pane} pane - The pane to attach the status light to.
@@ -205,27 +210,36 @@
       }
     };
     this.transitionEndHandler = function(event) {
-      this.style.transition = '';
-      this.style.height     = '';
-      this.style.opacity    = '';
-      document.body.removeChild(this);
+      if (event.propertyName === 'opacity') {
+        // Reset property values.
+        this.style.transition = '';
+        this.style.height     = '';
+        this.style.opacity    = '';
+
+        // Remove the valid-target class if present.
+        event.target.classList.remove('valid-target');
+
+        // Remove the line.
+        _this.pane.editor.linkLineContainer.removeChild(event.target);
+      }
     };
     this.showLinkHoverHandler = function(event) {
       timer = window.setTimeout(_this.showLink.bind(_this), 150, event);
     }
-    this.unShowLinkHoverHandler = function(event) {
+    this.hideLinkHoverHandler = function(event) {
       if (timer) {
         window.clearTimeout(timer);
         timer = null;
-        _this.unShowLink();
+        _this.hideLink();
       }
     };
-    this.unLinkClickHandler = function(event) {
+    this.breakLinkClickHandler = function(event) {
       // Stop this from triggering the end of a link.
       event.stopPropagation();
 
-      // Break the link.
-      _this.pane.linkToPane(null);
+      // Break the link and fade out all.
+      _this.hideLink();
+      _this.pane.linkToPane(false);
     };
 
     // Create the link line element.
@@ -234,7 +248,7 @@
 
     // Create the link display element.
     this.linkDisplayLine = document.createElement('div');
-    this.linkDisplayLine.className = 'link-line';
+    this.linkDisplayLine.className = 'link-line link-line-display';
 
     // Create the link bar.
     this.linkBar = document.createElement('div');
@@ -244,8 +258,8 @@
     this.linkButton = document.createElement('div');
     this.linkButton.className = 'link-button';
     this.linkButton.addEventListener('mouseover', this.showLinkHoverHandler);
-    this.linkButton.addEventListener('mouseout', this.unShowLinkHoverHandler);
-    this.linkButton.addEventListener('click', this.unLinkClickHandler);
+    this.linkButton.addEventListener('mouseout', this.hideLinkHoverHandler);
+    this.linkButton.addEventListener('click', this.breakLinkClickHandler);
 
     // Create the status light.
     this.linkLight = document.createElement('div');
@@ -273,7 +287,7 @@
     event.stopPropagation();
 
     // Add the link line and add event listeners.
-    document.body.appendChild(this.linkLine);
+    this.pane.editor.linkLineContainer.appendChild(this.linkLine);
     document.addEventListener('mousemove', this.drawLinkLineMoveHandler);
     document.addEventListener('click', this.endLinkClickHandler);
     document.addEventListener('keydown', this.endLinkKeyHandler);
@@ -306,13 +320,9 @@
 
     // If noLink is true, don't link the panes.
     if (makeLink) {
-      // Get the element under the mouse when the link ended.
-      var linkDestination = document.elementFromPoint(this.destinationX, this.destinationY);
-
-      // Dispatch a link event.
-      var linkEvent = new Event('link', { bubbles: true });
-      linkEvent.linkOrigin = this.pane;
-      linkDestination.dispatchEvent(linkEvent);
+      // Look for a pane under the cursor and link to it.
+      var targetPane = this.pane.editor.getPaneAtCoordinate(this.destinationX, this.destinationY);
+      if (targetPane) this.pane.linkToPane(targetPane);
     }
   };
 
@@ -322,37 +332,52 @@
    * Utilizees drawLine().
    */
   StatusLight.prototype.showLink = function() {
+    // Don't show the link if it doesn't exist.
+    if (!this.pane.linkedPane) return;
+
     // Add the link line to the document body.
     // This is done first so that offsetWidth can be accessed.
-    fadeIn(document.body, this.linkDisplayLine, 200, 'ease-in');
+    fadeIn(this.pane.editor.linkLineContainer, this.linkDisplayLine, 200, 'ease-in');
 
     // Get the light element's position.
+    var source    = this.pane.wrapper;
     var target    = this.pane.linkedPane.wrapper;
-    var position1 = this.linkLight.getBoundingClientRect();
+    var position1 = source.getBoundingClientRect();
     var position2 = target.getBoundingClientRect();
 
     // Calculate the source position.
     var origin = {
-      x: position1.left + this.linkLight.offsetWidth  / 2 - this.linkDisplayLine.offsetWidth / 2,
-      y: position1.top  + this.linkLight.offsetHeight / 2
+      x: position1.left + source.offsetWidth  / 2 - this.linkDisplayLine.offsetWidth / 2,
+      y: position1.top  + source.offsetHeight / 2 - this.linkDisplayLine.offsetWidth / 2
     };
 
     // Calculate the destination position.
     var destination = {
       x: position2.left + target.offsetWidth  / 2 - this.linkDisplayLine.offsetWidth / 2,
-      y: position2.top  + target.offsetHeight / 2
+      y: position2.top  + target.offsetHeight / 2 - this.linkDisplayLine.offsetWidth / 2
     };
 
     // Position and size the line.
     drawLine(this.linkDisplayLine, origin, destination);
+
+    // Recursively show child links.
+    this.pane.linkedPane.statusLight.showLink();
   };
+
+// @todo Hide link if link is broken.
+// @todo Place the larger focus icon on the proper (source) pane.
 
   /**
    * Fades out the link line added in showLink().
    */
-  StatusLight.prototype.unShowLink = function() {
+  StatusLight.prototype.hideLink = function() {
     // Remove the display line.
     fadeOut(this.linkDisplayLine, 200, 'ease-in');
+
+    // Recursively hide child links.
+    if (this.pane.linkedPane) {
+      this.pane.linkedPane.statusLight.hideLink();
+    }
   };
 
   /**
@@ -372,7 +397,18 @@
     var mouseX = this.destinationX = event.pageX - this.linkLine.offsetWidth / 2;
     var mouseY = this.destinationY = event.pageY;
 
+    // Draw the line.
     drawLine(this.linkLine, { x: originX, y: originY }, { x: mouseX, y: mouseY });
+
+    // Toggle the 'invalid-target' class if not hovering over a valid link target.
+    // Look for a pane under the cursor and link to it.
+    var targetPane = this.pane.editor.getPaneAtCoordinate(this.destinationX, this.destinationY);
+
+    if (targetPane) {
+      this.linkLine.classList.toggle('valid-target', this.pane.canLinkToPane(targetPane));
+    } else {
+      this.linkLine.classList.remove('valid-target');
+    }
   };
 
   /**
@@ -464,7 +500,7 @@
     if (destination.x > origin.x) angle *= -1;
 
     // Draw the line from the source to the destination.
-    line.style.height = length - 8 + 'px';
+    line.style.height = length + 'px';
     line.style.top    = origin.y + 'px';
     line.style.left   = origin.x + 'px';
     line.style.webkitTransform = 'rotate(' + angle + 'deg)';
@@ -569,9 +605,6 @@
 
     // Keep an array of all panes linked to this one.
     this.linkingPanes = [];
-
-    // Allow pane linking.
-    this.wrapper.addEventListener('link', this.linkHandler.bind(this));
 
     // Register focus and blur handlers for the pane.
     this.registerFocusHandlers();
@@ -695,40 +728,17 @@
   };
 
   /**
-   * Handles the link event.
-   *
-   * Note that the call to linkToPane() is on event.linkOrigin, not
-   * this pane, because direction matters in a link. (Mostly for when
-   * it's broken, and because the link icon on the pane's title bar
-   * only lights up on the pane that started the link. In other words,
-   * the pane that receives the link event is the *parent* pane.)
-   *
-   * @param {Event} event - The link event.
-   * @param {Pane} event.linkOrigin - The pane that requested the link.
-   */
-  Pane.prototype.linkHandler = function(event) {
-    event.linkOrigin.linkToPane(this);
-  };
-
-  /**
    * Keeps two panes synchronized.
    *
    * This means that both panes will share their contents, even if one of them switches
    * to a different buffer.
    *
-   * @param {Pane} pane - The pane to link to. Passing a falsey value will remove all links.
+   * @param {Pane|False} pane - The pane to link to. Passing a falsey value will remove all links.
    * @return {Boolean} False if a circular reference would be created, otherwise true.
    */
   Pane.prototype.linkToPane = function(pane) {
-    // Prevent linking to self or the same pane.
-    if (pane && (pane === this || pane === this.linkedPane)) return false;
-
-    // Prevent circular event loops.
-    if (pane && pane.linkedPane) {
-      for (var p = pane; p.linkedPane; p = p.linkedPane) {
-        if (p.linkedPane.buffer === this.buffer) return false;
-      }
-    }
+    // Return early if the pane link is disallowed.
+    if (pane && !this.canLinkToPane(pane)) return false;
 
     // Remove event handlers from old linked pane, and remove
     // this pane from the linked pane's list of linking panes.
@@ -768,6 +778,29 @@
 
     return true;
   };
+
+  /**
+   * Returns true if the given pane can link with this one.
+   *
+   * @param {Pane} pane - The pane to test.
+   * @return {Boolean} Whether or not a link is possible.
+   */
+  Pane.prototype.canLinkToPane = function(pane) {
+    // Only link to panes or subclasses.
+    if (pane instanceof Pane === false) return false;
+
+    // Prevent linking to self or the same pane.
+    if (pane && (pane === this || pane === this.linkedPane)) return false;
+
+    // Prevent circular event loops.
+    if (pane && pane.linkedPane) {
+      for (var p = pane; p.linkedPane; p = p.linkedPane) {
+        if (p.linkedPane.buffer === this.buffer) return false;
+      }
+    }
+
+    return true;
+  }
 
   /**
    * Unlinks all panes linked to this one.
@@ -1001,6 +1034,11 @@
     // Command-related properties.
     this.commandDictionary = {};
     this.commandHistory = [];
+
+    // For holding link lines.
+    this.linkLineContainer = document.createElement('div');
+    this.linkLineContainer.className = 'link-line-container';
+    document.body.appendChild(this.linkLineContainer);
 
     return this;
   }
@@ -1421,6 +1459,20 @@
   };
 
   /**
+   * Returns the pane at the given screen position.
+   *
+   * @param {Number} x - The horizontal position to check.
+   * @param {Number} y - The vertical position to check.
+   * @return {Pane|False} The pane at the given position, or false if none exists.
+   */
+  Editor.prototype.getPaneAtCoordinate = function(x, y) {
+    var target = document.elementFromPoint(x, y);
+    var paneElement = ancestorWithClass(target, 'pane');
+
+    return paneElement ? this.getPaneByElement(paneElement) : false;
+  };
+
+  /**
    * Defines a command. The parameters are just passed on to the Command constructor.
    *
    * @param {String} name - The name of the command.
@@ -1472,6 +1524,20 @@
         });
       }
     });
+  }
+
+  /**
+   * Returns the ancestor element that has the specified class.
+   * @see http://stackoverflow.com/a/16863971/1270419
+   *
+   * @param {Element} element - The element to start with.
+   * @param {String} className - The class to check for.
+   * @return {Element|False} The ancestor with the given class, or
+   *         false if not found.
+   */
+  function ancestorWithClass(element, className) {
+    if (element.classList && element.classList.contains(className)) return element;
+    return element.parentNode && ancestorWithClass(element.parentNode, className);
   }
 
 /* =======================================================
