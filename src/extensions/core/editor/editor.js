@@ -373,9 +373,6 @@
     this.pane.linkedPane.statusLight.showLink();
   };
 
-// @todo Hide link if link is broken.
-// @todo Place the larger focus icon on the proper (source) pane.
-
   /**
    * Fades out the link line added in showLink().
    */
