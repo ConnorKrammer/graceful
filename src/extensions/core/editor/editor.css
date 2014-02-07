@@ -275,6 +275,15 @@ body {
   z-index: 1000000;
 }
 
+/* Position dimensions are calculated as follows:
+ *
+ * top:    -(width / 2)
+ * bottom: -(width / 2)
+ * right:  -(width - linewidth) / 2
+ * 
+ * Having box-sizing: border-box set is important, as
+ * that is how the line's end node is resized when hovering
+ * over a valid link target. */
 .link-line:after,
 .link-line-display:before {
   content: "";
@@ -299,8 +308,6 @@ body {
   border-width: 5px;
 }
 
-/* top and bottom: -(width / 2)
- * right: -(width - linewidth) / 2 */
 .link-line:after {
   bottom: -19px;
 }
@@ -321,6 +328,7 @@ body {
   height: 26px;
   right: -11px;
   border-width: 10px;
+  transition: none;
 }
 
 .link-button {

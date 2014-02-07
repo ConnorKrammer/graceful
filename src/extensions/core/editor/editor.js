@@ -189,6 +189,15 @@
    * For line drawing method, see {@link http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html|here}.
    *
    * @todo Tidy up event handling.
+   * @todo Add key command to preview all links at the same time.
+   * @todo Allow rearrangement of linking order by dragging around the nodes
+   *       on the ends of link lines.
+   * @todo Rename .valid-target class to .link-endpoint class, to be more semantic
+   *       when displaying both link lines and link display lines.
+   * @todo Edit CSS rules so that node size on both link lines and link display lines
+   *       rely on the new .link-endpoint class, not :last-child or other methods.
+   *       This is important, as without it we can't style the whole link map at once
+   *       (since there is only one :last-child, and potentially more than one end node).
    * 
    * @constructor
    * @param {Pane} pane - The pane to attach the status light to.
@@ -782,7 +791,11 @@
   /**
    * Returns true if the given pane can link with this one.
    *
-   * @param {Pane} pane - The pane to test.
+   * Note that linkToPane() allows falsey values (to terminate
+   * an existing link), but those values will not return true
+   * from this function.
+   *
+   * @param {Pane} pane - The pane to test for linkability.
    * @return {Boolean} Whether or not a link is possible.
    */
   Pane.prototype.canLinkToPane = function(pane) {
@@ -790,12 +803,12 @@
     if (pane instanceof Pane === false) return false;
 
     // Prevent linking to self or the same pane.
-    if (pane && (pane === this || pane === this.linkedPane)) return false;
+    if (pane === this || pane === this.linkedPane) return false;
 
-    // Prevent circular event loops.
-    if (pane && pane.linkedPane) {
+    // Prevent circular links.
+    if (pane.linkedPane) {
       for (var p = pane; p.linkedPane; p = p.linkedPane) {
-        if (p.linkedPane.buffer === this.buffer) return false;
+        if (p.linkedPane === this) return false;
       }
     }
 
