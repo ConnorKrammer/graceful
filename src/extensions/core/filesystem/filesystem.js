@@ -90,7 +90,7 @@
         if (!doesExist) return FileSystem.makeDirectory(directoryPath);
       })
       .then(function() {
-        return FileSystem.writeFile(path, data);
+        deferred.resolve(FileSystem.writeFile(path, data));
       })
       .fail(function(error) {
         deferred.reject(error);
