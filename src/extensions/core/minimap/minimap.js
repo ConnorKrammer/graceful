@@ -14,6 +14,11 @@
    * Creates a minimap that displays the editor content and can be used
    * as a draggable scrollbar.
    *
+   * @todo Allow the calling the mini command a second time to remove the
+   *       minimap from the current pane.
+   * @todo Clean up event listeners when removing a minimap, or when closing
+   *       the minimap's pane.
+   *
    * @constructor
    * @param {InputPane} pane - The pane to add the minimap to.
    * @return {MiniMap} The created minimap.
@@ -23,10 +28,10 @@
     var cm, minimap, inner, overlay, preview, regex, scale;
 
     // Exit early if it isn't an input pane.
-    if (pane.type !== 'input') return;
+    if (pane instanceof Editor.InputPane === false) return;
 
     // Get the wrapper and editor, and create the mini map components.
-    cm      = pane.editor;
+    cm      = pane.cm;
     minimap = document.createElement('div');
     inner   = document.createElement('pre');
     overlay = document.createElement('div');
@@ -50,15 +55,22 @@
     regex = /([0-9]+(?:\.[0-9]*)?)/; // Matches the first number.
     scale = parseFloat(getComputedStyle(minimap).webkitTransform.match(regex)[0]);
 
-    // Set up event listeners.
-    pane.on('resize',        _.throttle(this.updateDisplay.bind(this), 50));
-    pane.editor.on('change', _.debounce(this.updateContent.bind(this), 100));
-    pane.editor.on('scroll', _.throttle(this.updateContent.bind(this), 50));
-    pane.editor.on('scroll', _.debounce(this.updateInnerContent.bind(this), 500, {
-      leading: true,
-      trailing: true
-    }));
-    pane.editor.on('swapDoc', function() {
+    // Update the display on resize.
+    pane.on('resize', _.throttle(function() {
+      _this.updateDisplay();
+    }, 50));
+
+    // Update the content when text changes.
+    pane.cm.on('change', _.throttle(function() {
+      _this.updateContent();
+      _this.updateInnerContent();
+    }, 10));
+
+    // Update content when scrolling.
+    pane.cm.on('scroll', _.throttle(function() { _this.updateContent(); }, 50));
+
+    // Reset everything if the pane switches its buffer.
+    pane.cm.on('swapDoc', function() {
       _this.updateContent();
       _this.updateInnerContent();
       _this.updateDisplay();
@@ -66,14 +78,14 @@
 
     // Drag information.
     this.dragInfo = {
-      dragHandler: null,
+      dragHandler: _.throttle(function(event) {
+        _this.dragHandler(event);
+        _this.updateContent();
+      }, 20),
       isDrag: false,
       lastY: 0,
       deltaY: 0
     };
-
-    // Throttle the drag handler.
-    this.dragInfo.dragHandler = _.throttle(this.dragHandler.bind(this), 20);
 
     // Start the drag on mousedown.
     overlay.addEventListener('mousedown', function(event) {
@@ -238,18 +250,16 @@
 
   /**
    * Shows the full content of the editor in the minimap.
-   * This is more expensive than updating the overlay, so it uses
-   * a custom replaceHTML function and is called less frequently.
-   * It also doesn't utilize CodeMirror's mode capabilities.
-   *
-   * Note that an empty space is appended to the text if the last line
-   * is empty, otherwise the last line will not display.
+   * This is more expensive than updating the overlay, so it
+   * doesn't utilize CodeMirror's mode capabilities.
    */
   MiniMap.prototype.updateInnerContent = function() {
     var text = this.cm.doc.getValue();
+
+    // If the last line is empty, append a space so that it renders.
     text += (text[text.length - 1] === '\n') ? ' ' : '';
 
-    this.inner = replaceHTML(this.inner, text);
+    this.inner.textContent = text;
   };
 
   /**
@@ -260,7 +270,7 @@
    */
   MiniMap.prototype.updateDisplay = function() {
     var wrapper         = this.pane.wrapper;
-    var measureTarget   = wrapper.parentElement.classList.contains('splitter') ? wrapper : wrapper.parentElement;
+    var measureTarget   = !wrapper.parentElement.classList.contains('splitter') ? wrapper : wrapper.parentElement;
     var panePercent     = parseFloat(measureTarget.style.width, 10) / 100;
     var paneParentWidth = parseFloat(getComputedStyle(measureTarget.parentElement).width, 10);
     var paneWidth       = panePercent * paneParentWidth;
@@ -279,25 +289,6 @@
 
     this.updateScroll();
   };
-
-  /**
-   * Replaces an element's HTML contents.
-   * @see http://blog.stevenlevithan.com/archives/faster-than-innerhtml
-   *
-   * @param {Element} element - The element to alter.
-   * @param {String} html - The new element contents.
-   * @return {Element} The replaced element.
-   */
-  function replaceHTML(el, html) {
-    var oldEl = typeof el === "string" ? document.getElementById(el) : el;
-    var newEl = oldEl.cloneNode(false);
-    newEl.innerHTML = html;
-    oldEl.parentNode.replaceChild(newEl, oldEl);
-
-    /* Since we just removed the old element from the DOM, return a reference
-       to the new element, which can be used to restore variable references. */
-    return newEl;
-  }
 
   /**
    * Sets a transition property on an element, then removes that transition
@@ -331,8 +322,7 @@
    * The command gives other commands priority.
    */
   graceful.onLoad(function() {
-    graceful.editor.defineCommand('mini', 0, function() {
-      var pane = graceful.editor.getFocusPane();
+    graceful.editor.defineCommand('mini', 0, function(pane) {
       var minimap = new MiniMap(pane);
     }, null, true);
   });
