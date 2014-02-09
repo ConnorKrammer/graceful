@@ -126,10 +126,72 @@
   });
 
   /**
+   * Returns a new path absolute to the current path's directory.
+   *
+   * Examples:
+   *
+   *   getAbsolutePath('C:/dir/file.txt', './new.txt')         -> 'C:/dir/new.txt'
+   *   getAbsolutePath('C:/dir/file.txt', '../new.txt')        -> 'C:/new.txt'
+   *   getAbsolutePath('C:/dir/file.txt', 'new.txt')           -> false
+   *   getAbsolutePath('C:/dir/file.txt', './newDir/new.txt')  -> 'C:/dir/newDir/new.txt'
+   *   getAbsolutePath('C:/dir/file.txt', '../newDir/new.txt') -> 'C:/newDir/new.txt'
+   *   getAbsolutePath('C:/dir/file.txt', 'newDir/new.txt')    -> false
+   *
+   * Note that the current path is assumed to be an absolute path itself, but
+   * is not checked to actually be one.
+   *
+   * @param {String} currentPath - The current path.
+   * @param {String} path - The relative path.
+   * @param {Boolean} [fallback=false] - Whether to return the current path's directory
+   *        if the path argument is invalid.
+   * @return {String|False} The new, absolute path, or false if not possible.
+   */
+  function getAbsolutePath(currentPath, path, fallback) {
+    var firstThreeChars, firstTwoChars, index;
+
+    // Exit early if there is no current path.
+    if (!currentPath) return false;
+
+    // Either exit early or use the fallback.
+    if (!path && !fallback) return false;
+    else if (!path) path = './';
+
+    firstThreeChars = path.substr(0, 3);
+    firstTwoChars   = path.substr(0, 2);
+
+    // If the path isn't relative, return false.
+    if (firstThreeChars !== '../'
+     && firstThreeChars !== '..\\' 
+     && firstTwoChars   !== './'
+     && firstTwoChars   !== '.\\') {
+      if (!fallback) return false;
+      path = firstThreeChars = firstTwoChars = './';
+    }
+
+    // Prepend './' to paths starting with parent folder references.
+    if (firstThreeChars === '../' || firstThreeChars === '..\\') {
+      path = './' + path;
+      firstTwoChars = './';
+    }
+
+    // Replace './' or '.\' with the current filepath directory.
+    if (firstTwoChars === './' || firstTwoChars === '.\\') {
+      index = Math.max(currentPath.lastIndexOf('/'), currentPath.lastIndexOf('\\')) + 1;
+      path = currentPath.substr(0, index) + path.substr(2);
+    }
+
+    return path;
+  }
+
+  /**
    * Opens a file into the given pane.
    * 
    * When calling this command on a pane that is linked to another pane,
    * the link will be broken. This is due to the one-way nature of the link.
+   *
+   * @todo Currently this only works with relative filepaths.
+   *       When the python API is implemented it will allow a simple method
+   *       of checking for absolute filepaths.
    *
    * @param {Editor.pane} pane - The pane to open the file in.
    * @param {String} path - The path to open. If not specified,
@@ -141,56 +203,37 @@
    */
   graceful.editor.defineCommand('open', 1, function(pane, path) {
     var buffer = pane.buffer;
-    var firstChars;
 
-    // Make non-absolute filepaths relative to the buffer's filepath.
-    if (buffer.filepath) {
-      path       = path || './';
-      firstChars = path.substr(0, 3);
-
-      if (path.indexOf('/') === -1 && path.indexOf('\\') === -1) {
-        path = './' + path;
-      }
-
-      if (firstChars === '../' || firstChars === '..\\') {
-        path = './' + path;
-      }
-
-      firstChars = path.substr(0, 2);
-
-      if (firstChars === './' || firstChars === '.\\') {
-        path = buffer.filepath.substr(0, buffer.filepath.lastIndexOf(buffer.title))
-          + path.substr(2);
-      }
-    }
+    // Resolve relative filepaths.
+    path = getAbsolutePath(buffer.filepath, path, true) || '';
 
     return FileSystem.pathType(path)
       .then(function(type) {
         if (type === 'file') {
           // If it's an existing file, open it.
           return FileSystem.readFile(path)
-        .then(function(contents) {
-          pane.switchBuffer(new Editor.Buffer(contents, path), true);
-        });
+            .then(function(contents) {
+              pane.switchBuffer(new Editor.Buffer(contents, path), true);
+            });
         }
         else if (type === 'directory') {
           // If it's an existing directory, start the open dialogue there.
           return FileSystem.showOpenDialog(null, path)
-        .then(function(selection) {
-          return FileSystem.readFile(selection)
-          .then(function(contents) {
-            pane.switchBuffer(new Editor.Buffer(contents, selection), true);
-          });
-        })
+            .then(function(selection) {
+              return FileSystem.readFile(selection)
+                .then(function(contents) {
+                  pane.switchBuffer(new Editor.Buffer(contents, selection), true);
+              });
+            })
         }
         else if (!type || !path) {
           // If there is no path, start the open dialogue at the last used location.
           return FileSystem.showOpenDialog()
             .then(function(selection) {
               return FileSystem.readFile(selection)
-              .then(function(contents) {
-                pane.switchBuffer(new Editor.Buffer(contents, selection), true);
-              });
+                .then(function(contents) {
+                  pane.switchBuffer(new Editor.Buffer(contents, selection), true);
+                });
             });
         }
       });
@@ -198,6 +241,10 @@
 
   /**
    * Saves the content of the given pane.
+   *
+   * @todo Currently this only works with relative filepaths.
+   *       When the python API is implemented it will allow a simple method
+   *       of checking for absolute filepaths.
    *
    * @param {Editor.pane} pane - The pane to open the file in.
    * @param {String} path - The path to save to. If not specified,
@@ -208,69 +255,54 @@
    * @return {Promise} A promise for the save operation.
    */
   graceful.editor.defineCommand('save', 1, function(pane, path) {
-    var buffer     = pane.buffer;
-    var firstChars = path.substr(0, 2);
-    var lastChar   = path.substr(-1);
+    var buffer = pane.buffer;
+    var lastChar;
 
-    // Make non-absolute filepaths relative to the buffer's filepath.
-    if (buffer.filepath) {
-      path       = path || './';
-      firstChars = path.substr(0, 3);
-
-      if (path.indexOf('/') === -1 && path.indexOf('\\') === -1) {
-        path = './' + path;
-      }
-
-      if (firstChars === '../' || firstChars === '..\\') {
-        path = './' + path;
-      }
-
-      firstChars = path.substr(0, 2);
-
-      if (firstChars === './' || firstChars === '.\\') {
-        path = buffer.filepath.substr(0, buffer.filepath.lastIndexOf(buffer.title))
-          + path.substr(2);
-      }
-    }
+    // Resolve relative filepaths.
+    path     = getAbsolutePath(buffer.filepath, path) || buffer.filepath || '';
+    lastChar = path.slice(-1);
 
     return FileSystem.pathType(path)
       .then(function(type) {
         if (type === 'file') {
           // If it's an existing file, overwrite it.
           return FileSystem.writeFile(path, buffer.text)
-        .then(function() {
-          buffer.setFilepath(path);
-        });
+            .then(function() {
+              buffer.setFilepath(path);
+            });
         }
         else if (type === 'directory') {
           // If it's an existing directory, open the save dialogue there.
           return FileSystem.showSaveDialogue(null, path, buffer.title)
-        .then(function(selection) {
-          return FileSystem.writeFile(selection, buffer.text)
-          .then(function() {
-            buffer.setFilepath(path);
-          });
-        });
+            .then(function(selection) {
+              return FileSystem.writeFile(selection, buffer.text)
+                .then(function() {
+                  buffer.setFilepath(selection);
+                });
+            });
         }
         else if (!type && path && (lastChar === '/' || lastChar === '\\')) {
           // If it's an uncreated directory, create it. If the user cancels, delete it again.
           return FileSystem.makeDirectory(path)
             .then(function() {
-              FileSystem.showSaveDialogue(null, path, buffer.title)
-              .then(function(selection) {
-                return FileSystem.writeFile(selection, buffer.text)
-                .then(function() {
-                  buffer.setFilepath(path);
+              return FileSystem.showSaveDialogue(null, path, buffer.title)
+                .then(function(selection) {
+                  return FileSystem.writeFile(selection, buffer.text)
+                    .then(function() {
+                      buffer.setFilepath(selection);
+                    });
+                })
+                .fail(function(error) {
+                  FileSystem.unlink(path);
                 });
-              })
-            .fail(function(error) {
-              FileSystem.unlink(path);
             });
-          });
         }
         else if (!type && path) {
           // If an uncreated file is specified, recursively create the filepath and save it.
-          return FileSystem.writeFileRecursive(path, buffer.text);
+          return FileSystem.writeFileRecursive(path, buffer.text)
+            .then(function() {
+              buffer.setFilepath(path);
+            });
         }
         else if (!path && buffer.filepath) {
           // If no path was specified but the buffer is associated with a filepath, save it there.
@@ -281,9 +313,9 @@
           return FileSystem.showSaveDialogue(null, null, buffer.title)
             .then(function(selection) {
               return FileSystem.writeFile(selection, buffer.text)
-              .then(function() {
-                buffer.setFilepath(path);
-              });
+                .then(function() {
+                  buffer.setFilepath(selection);
+                });
             });
         }
       });
