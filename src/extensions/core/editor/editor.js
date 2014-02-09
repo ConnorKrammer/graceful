@@ -1383,14 +1383,14 @@
       resizePanes = [];
 
       // Get the pane, or its sub-panes if applicable.
-      if (prev.classList.contains('splitter-pane')) {
+      if (prev.classList.contains('vertical-splitter-pane')) {
         children = children.concat(Array.prototype.slice.call(prev.children));
       } else {
         children.push(prev);
       }
 
       // Get the pane, or its sub-panes if applicable.
-      if (next.classList.contains('splitter-pane')) {
+      if (next.classList.contains('vertical-splitter-pane')) {
         children = children.concat(Array.prototype.slice.call(next.children));
       } else {
         children.push(next);
