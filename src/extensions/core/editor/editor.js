@@ -337,10 +337,13 @@
 
   /**
    * Draws a link line between the status light and the center of the linked pane.
+   * Utilizes drawLine().
    *
-   * Utilizees drawLine().
+   * @param {Boolean} [recursive=true] If true, shows links recursively.
    */
-  StatusLight.prototype.showLink = function() {
+  StatusLight.prototype.showLink = function(recursive) {
+    if (typeof recursive === 'undefined') recursive = true;
+
     // Don't show the link if it doesn't exist.
     if (!this.pane.linkedPane) return;
 
@@ -370,7 +373,7 @@
     drawLine(this.linkDisplayLine, origin, destination);
 
     // Recursively show child links.
-    this.pane.linkedPane.statusLight.showLink();
+    if (recursive) this.pane.linkedPane.statusLight.showLink();
   };
 
   /**
@@ -717,7 +720,7 @@
     this.buffer = buffer;
     this.trigger('changeBuffer', [buffer]);
 
-    this.titleElement.innerText = buffer.title;
+    this.titleElement.textContent = buffer.title;
 
     // Stop tracking the old buffer's title changes.
     if (typeof this.titleChangeID !== 'undefined') {
@@ -726,7 +729,7 @@
 
     // Track the new buffer's title.
     this.titleChangeID = buffer.on('changeFilepath', function() {
-      _this.titleElement.innerText = buffer.title;
+      _this.titleElement.textContent = buffer.title;
     });
 
     // Return a reference to the old buffer.
@@ -1061,7 +1064,7 @@
   Editor.prototype.init = function() {
     // Add the test panes.
     var input = this.addPane(InputPane, null, 'horizontal');
-    var preview = this.addPane(PreviewPane, null, 'horizontal');
+    //var preview = this.addPane(PreviewPane, null, 'horizontal');
   };
 
   /**
@@ -1190,7 +1193,7 @@
       if (pane.linkingPanes) pane.unlinkAllPanes();
 
       // Resize the remaining panes.
-      if (sibling.classList.contains('horizontal')) {
+      if (sibling.classList.contains('splitter-horizontal')) {
         sizePanesEvenly(this, container, 'horizontal');
       } else {
         sizePanesEvenly(this, container, 'vertical');
@@ -1395,7 +1398,7 @@
 
       // Filter out any splitters.
       children = _.filter(children, function(child) {
-        return child.classList.contains('splitter');
+        return !child.classList.contains('splitter');
       });
 
       // Store the panes for later.
@@ -1483,17 +1486,94 @@
   };
 
   /**
-   * Defines a command. The parameters are just passed on to the Command constructor.
+   * Defines a command.
    *
-   * @param {String} name - The name of the command.
-   * @param {Integer} argCount - The number of arguments the command function accepts.
-   * @param {Function} func - The function the command invokes.
-   * @param {String} delimeter - The delimeter between function arguments.
-   * @param {Boolean} forceLast - Whether the command should be pushed to the end
-   *        of the call list when several commands are run sequentially.
+   * @param {String}   name      - The name of the command.
+   * @param {Integer}  argCount  - The number of arguments the command function accepts.
+   * @param {Function} func      - The function the command invokes.
+   * @param {String}   delimeter - The delimeter between function arguments.
+   * @param {Boolean}  forceLast - Whether the command should be pushed to the end
+   *                               of the call list when several commands are run
+   *                               sequentially.
+   * @return {Boolean} Returns false if the command already exists or contains
+   *         whitespace, otherwise true.
    */
   Editor.prototype.defineCommand = function(name, argCount, func, delimeter, forceLast) {
-    this.commandDictionary[name] = new Command(name, argCount, func, delimeter, forceLast);
+    // Trim whitespace.
+    name = name.trim();
+
+    // Don't allow whitespace in name.
+    if (/\s/g.test(name)) {
+      console.log("Command '" + name + "' cannot contain whitepace in name.");
+      return false;
+    }
+
+    // Don't overwrite an existing command.
+    if (this.commandDictionary[name]) {
+      console.log("Command '" + name + "' already exists!");
+      return false;
+    }
+
+    // Define the command.
+    this.commandDictionary[name] = new Command({
+      name: name,
+      argCount: argCount,
+      func: func,
+      delimeter: delimeter,
+      forceLast: forceLast
+    });
+
+    return true;
+  };
+
+  /**
+   * Aliases a command.
+   *
+   * Arguments passed to an aliased command will be inserted into the
+   * alias string at positions specified by format markers: {0}, {1}, {2}, etc.
+   *
+   * For example, aliasing 'split_v {0} true' to 'sv' will allow you to run the
+   * command 'sv preview', which would be parsed into 'split_v preview true'.
+   *
+   * Such format markers can be reused. An alias could be created like this:
+   * 'sb' -> 'split_v null {0} \n split_h null {0}' and calling 'sb true' would
+   * result in two commands being run: 'split_v null true' and 'split_h null true',
+   * both with the passed argument in the position of the {0} marker.
+   *
+   * Any format markers that are not used when calling an alias are cut out of the
+   * resulting command.
+   *
+   * @param {String} string - The command to alias, and any arguments.
+   * @param {String} alias  - The name of the alias.
+   * @return {Boolean} Returns false if the command already exists or contains
+   *         whitespace, otherwise true.
+   */
+  Editor.prototype.aliasCommand = function(alias, string) {
+    // Trim whitespace.
+    alias = alias.trim();
+    string = string.trim();
+
+    // Don't allow whitespace in name.
+    if (/\s/g.test(alias)) {
+      console.log("Alias '" + alias + "' cannot contain whitepace in name.");
+      return false;
+    }
+
+    // Don't overwrite an existing alias.
+    if (this.commandDictionary[alias]) {
+      console.log("Alias '" + alias + "' already exists!");
+      return false;
+    }
+
+    // Get the number of arguments, passed in the string as {0}, {1}, {2}, etc.
+    var match    = string.match(/{\d}/g);
+    var argCount = match ? match.length : 0;
+
+    this.commandDictionary[alias] = new Command({
+      name: alias,
+      argCount: argCount,
+      aliasOf: string
+    });
   };
 
   /**
@@ -1561,25 +1641,30 @@
    * out of a string to be passed to that function.
    *
    * @constructor
-   * @param {String} name - The name of the command.
-   * @param {Integer} argCount - The number of arguments the command function accepts.
-   * @param {Function} func - The function the command invokes.
-   * @param {String} delimeter - The delimeter between function arguments.
-   * @param {Boolean} forceLast - Whether the command should be pushed to the end
-   *        of the call list when several commands are run sequentially.
+   * @param {Object}   config           - A configuration object.
+   * @param {String}   config.name      - The name of the command.
+   * @param {Integer}  config.argCount  - The number of arguments the command function accepts.
+   * @param {Function} config.func      - The function the command invokes.
+   * @param {String}   config.delimeter - The delimeter between function arguments.
+   * @param {Boolean}  config.forceLast - Whether the command should be pushed to the end
+   *                                      of the call list when several commands are run sequentially.
+   * @param {String}   config.aliasOf   - A string to alias the command to.
    */
-  function Command(name, argCount, func, delimeter, forceLast) {
-    this.name      = name;
-    this.func      = func;
-    this.argCount  = argCount;
-    this.delimeter = delimeter || ' ';
-    this.forceLast = forceLast || false;
+  function Command(config) {
+    this.name = config.name;
+    this.argCount  = config.argCount;
+    this.delimeter = config.delimeter || ' ';
+    this.forceLast = config.forceLast || false;
+
+    if (config.aliasOf) this.aliasOf = config.aliasOf;
+    else this.func = config.func;
 
     return this;
   }
 
   /**
-   * Function that throws an error.
+   * Throws an error.
+   *
    * Used by parseCommand() to construct a Command object that
    * fails in a manner expected by runCommand(), for cases where
    * the supplied string can't be parsed.
@@ -1590,52 +1675,101 @@
 
   /**
    * Parses the name and arguments for a command out of a string and
-   * fetches the command from the editor's command hash.
+   * fetches the command from the editor's command hash. Aliases are
+   * resolved recursively (meaning that nested aliases are possible).
    *
-   * @param {String} input - The input command string.
+   * @param {String} string - The input command string.
    * @param {Object} dictionary - A hash table mapping command names to Command objects.
-   * @return {Array|False} An array with a Command instance in the first
-   *         index, and an array of arguments to pass to the command
-   *         in the second. A special command is returned if the input
-   *         is unrecognized, and false is returned on blank input.
+   * @param {String[]} recursionChain - A list of the commands that have been recursed through.
+   *        This is used internally to prevent circular aliases.
+   *
+   * @return {Array[]|False} An array of command arrays, each array
+   *         with a Command instance in the first index, and an array of
+   *         arguments to pass to the command in the second. A special
+   *         command is returned if the input is unrecognized, and false
+   *         will be returned.
    */
-   function parseCommand(input, dictionary) {
-    var name, command, args, index, ret, error;
+  function parseCommand(string, dictionary, recursionChain) {
+    // Initialize recursion chain.
+    recursionChain = recursionChain || [];
 
-    // Do nothing if the command is blank.
-    if (input.trim() === '') return false;
+    // Split the string on newlines and start parsing!
+    var value = _(string.split('\n'))
+      .map(function(input) {
+        var name, command, aliasedCommand, args, index, ret, error;
 
-    // Get the command.
-    name = input.split(' ', 1).toString();
-    command = dictionary[name];
+        // Trim whitespace.
+        input = input.trim();
 
-    // Return a failing command if command is unknown.
-    if (typeof command === 'undefined') {
-      return [new Command(name, 0, failCommand), null];
-    }
+        // Return false if the input is blank.
+        if (input === '') return false;
 
-    // Parse out the arguments.
-    index = input.indexOf(' ');
-    input = index !== -1 ? input.substr(index + 1) : '';
-    args  = input.split(command.delimeter);
+        // Get the command.
+        name = input.split(' ', 1).toString();
+        command = dictionary[name];
 
-    // If arguments are requested, add the remainder of the command
-    // string to the final argument. If argCount < 0 then unlimited
-    // arguments are allowed, and are passed as a single array.
-    if (command.argCount === 0) {
-      args = [];
-    }
-    else if (command.argCount < 0) {
-      args = [args];
-    }
-    else if (command.argCount > 0 && args.length > command.argCount) {
-      ret = args.splice(0, command.argCount);
-      ret.push(ret.pop() + command.delimeter + args.join(command.delimeter));
-      args = ret;
-    }
+        // Return a failing command if command is unknown.
+        if (typeof command === 'undefined') {
+          return {
+            command: new Command({
+              name: name,
+              func: failCommand
+            }),
+            args: null
+          };
+        }
 
-    // Return the command.
-    return [command, args];
+        // Throw an error if an alias references itself in a circular manner.
+        if (recursionChain.indexOf(name) !== -1) {
+          error = new Error("Aliased command '" + recursionChain[0] + "' causes circular reference.\n"
+            + 'Command chain: ' + '[' + recursionChain.concat(name).join('] -> [') + ']');
+          Utils.printFormattedError('Command parsing failed due to error:', error);
+          throw error;
+        }
+
+        // Parse out the arguments.
+        index = input.indexOf(' ');
+        input = index !== -1 ? input.substr(index + 1) : '';
+        args  = input.split(command.delimeter);
+
+        // If arguments are requested, add the remainder of the command
+        // string to the final argument. If argCount < 0 then unlimited
+        // arguments are allowed, and are passed as a single array.
+        if (command.argCount === 0) {
+          args = [];
+        }
+        else if (command.argCount < 0) {
+          args = [args];
+        }
+        else if (command.argCount > 0 && args.length > command.argCount) {
+          ret = args.splice(0, command.argCount);
+          ret.push(ret.pop() + command.delimeter + args.join(command.delimeter));
+          args = ret;
+        }
+
+        if (command && command.aliasOf) {
+          // Replace argument markers with the corresponding arguments.
+          // If not enough arguments are passed to replace all markers, then unused
+          // ones are removed.
+          aliasedCommand = command.aliasOf.replace(/{(\d+)}/g, function(match, number) { 
+            return (typeof args[number] !== 'undefined') ? args[number] : '';
+          });
+
+          // Recursively resolve aliased commands.
+          return parseCommand(aliasedCommand, dictionary, recursionChain.concat(name));
+        }
+
+        // Return the command.
+        return {
+          command: command,
+          args: args
+        };
+      })
+      .compact()
+      .flatten()
+      .value();
+
+    return value.length ? value : false;
   }
 
   /**
@@ -1644,7 +1778,6 @@
    *
    * Note that if one of the commands fail, any following commands will be skipped.
    *
-   * @todo Allow command aliasing.
    * @todo Allow the pane to be changed dynamically by certain commands (important for ones
    *       that might add or remove panes). Implementation should take the pane argument
    *       as a function that would return the proper pane to execute on.
@@ -1656,59 +1789,58 @@
    * @param {Object[]} [history] - An array of history objects to append the run results to.
    */
    function runCommand(list, dictionary, pane, history) {
-    // Parse out an array of commands from the list.
-    var commands = _([].concat(list))
-      .map(   function(string)  { return parseCommand(string, dictionary); })
-      .filter(function(results) { return typeof results[0] !== 'undefined'; })
-      .sortBy(function(results) { return results[0].forceLast ? 1 : 0; })
-      .value();
+     // Parse out an array of commands from the list.
+     var commands = _([].concat(list))
+       .map(function(string) { return parseCommand(string, dictionary); }).flatten()
+       .sortBy(function(results) { return results.command.forceLast ? 1 : 0; })
+       .value();
 
-    // Create an item to track command results.
-    var historyItem = { time: new Date() };
+     // Create an item to track command results.
+     var historyItem = { time: new Date() };
 
-    // Setting this to true within the _.reduce() call will skip remaining commands.
-    var failHard = false;
+     // Setting this to true within the _.reduce() call will skip remaining commands.
+     var failHard = false;
 
-    // Save a record of the commands if requested.
-    if (history) history.push(historyItem);
-      
-    // Run through the commands in order.
-    _.reduce(commands, function(promiseChain, commandInfo, index) {
-      var command = commandInfo[0];
-      var args = [pane].concat(commandInfo[1]);
+     // Save a record of the commands if requested.
+     if (history) history.push(historyItem);
 
-      // Wait for any returned promises to resolve before continuing.
-      return Q.when(promiseChain, function() {
-        historyItem[index] = {
-          name: command.name,
-          result: 'Succeeded'
-        };
+     // Run through the commands in order.
+     _.reduce(commands, function(promiseChain, commandInfo, index) {
+       var command = commandInfo.command;
+       var args = [pane].concat(commandInfo.args);
 
-        // There was an error: skip remaining commands.
-        if (failHard) throw new Error();
+       // Wait for any returned promises to resolve before continuing.
+       return Q.when(promiseChain, function() {
+         historyItem[index] = {
+           name: command.name,
+              result: 'Succeeded'
+         };
 
-        return command.func.apply(null, args);
-      })
-      .fail(function(error) {
-        if (command.func === failCommand) {
-          historyItem[index].result = 'Unrecognized';
-        }
-        else if (failHard) {
-          historyItem[index].result = 'Skipped';
-        }
-        else {
-          historyItem[index].result = 'Failed: ' + error.message;
-        }
+         // There was an error: skip remaining commands.
+         if (failHard) throw new Error();
 
-        if (!failHard) {
-          Utils.printFormattedError("Editor command '" + command.name
-            + "' failed with error:", error);
-        }
+         return command.func.apply(null, args);
+       })
+       .fail(function(error) {
+         if (command.func === failCommand) {
+           historyItem[index].result = 'Unrecognized';
+         }
+         else if (failHard) {
+           historyItem[index].result = 'Skipped';
+         }
+         else {
+           historyItem[index].result = 'Failed: ' + error.message;
+         }
 
-        // Skip remaining commands.
-        failHard = true;
-      });
-    }, null);
+         if (!failHard) {
+           Utils.printFormattedError("Editor command '" + command.name
+             + "' failed with error:", error);
+         }
+
+         // Skip remaining commands.
+         failHard = true;
+       });
+     }, null);
    }
 
 /* =======================================================
@@ -1816,9 +1948,6 @@
     this.pane.wrapper.removeChild(this.element);
     this.pane.setFocus('commandBarFocus', false);
     if (isFocused) this.pane.focus();
-
-    // Don't track the caret between open/close toggles.
-    this.caretPosition = false;
   };
 
   /**
@@ -1860,12 +1989,12 @@
     // Exit if there isn't any text entered.
     if (!this.hasText()) return;
 
-    // Run each line of text as a command.
-    var commands = this.element.innerText.split(/\n+/);
-    runCommand(commands, this.dictionary, this.pane, this.history);
+    // Get the text content and clear the input.
+    var text = this.element.textContent;
+    this.element.textContent = '';
 
-    // Clear the entered text.
-    this.element.innerText = '';
+    // Run entered text as a command.
+    runCommand(text, this.dictionary, this.pane, this.history);
   };
 
   /**
@@ -1875,7 +2004,7 @@
    * @return {Boolean} Whether or not the command bar contains text.
    */
   CommandBar.prototype.hasText = function() {
-    return this.element.innerText.replace(/\s+/g, '') !== '';
+    return this.element.textContent.replace(/\s+/g, '') !== '';
   };
 
   // Expose globals.
