@@ -207,26 +207,29 @@
   FileSystem.pathType = function(path) {
     var deferred = Q.defer();
 
-    if (!path || path === '') {
+    // Resolve immediately to false if there's no path.
+    if (!path) {
       deferred.resolve(false);
-    } else {
-      appshell.fs.readFile(path, "utf8", function(error, data) {
-        appshell.fs.readdir(path, function(error2, data2) {
-          if (error === appshell.fs.NO_ERROR) {
-            deferred.resolve('file');
-          }
-          else if (error2 === appshell.fs.NO_ERROR) {
-            deferred.resolve('directory');
-          }
-          else if (error === appshell.fs.ERR_NOT_FOUND && error2 === appshell.fs.ERR_NOT_FOUND) {
-            deferred.resolve(false);
-          }
-          else {
-            deferred.reject(new Error('Path type could not be determined.'));
-          }
-        });
-      });
+      return deferred.promise;
     }
+
+    // Check for the path's type by attempting to read it as both a file and a directory.
+    appshell.fs.readFile(path, "utf8", function(error, data) {
+      appshell.fs.readdir(path, function(error2, data2) {
+        if (error === appshell.fs.NO_ERROR) {
+          deferred.resolve('file');
+        }
+        else if (error2 === appshell.fs.NO_ERROR) {
+          deferred.resolve('directory');
+        }
+        else if (error === appshell.fs.ERR_NOT_FOUND && error2 === appshell.fs.ERR_NOT_FOUND) {
+          deferred.resolve(false);
+        }
+        else {
+          deferred.reject(new Error('Path type could not be determined.'));
+        }
+      });
+    });
 
     return deferred.promise;
   };
