@@ -115,7 +115,7 @@
     this.title = title;
 
     // Notify listeners that the filepath changed.
-    this.trigger('changeFilepath', this);
+    this.trigger('changeFilepath', [filepath, title]);
   };
 
   /**
@@ -728,8 +728,8 @@
     }
 
     // Track the new buffer's title.
-    this.titleChangeID = buffer.on('changeFilepath', function() {
-      _this.titleElement.textContent = buffer.title;
+    this.titleChangeID = buffer.on('changeFilepath', function(filepath, title) {
+      _this.titleElement.textContent = title;
     });
 
     // Return a reference to the old buffer.
@@ -940,8 +940,8 @@
     }
     
     // Listen for filepath changes on the new buffer.
-    this.filetypeChangeID = buffer.on('changeFilepath', function(buffer) {
-      _this.setMode(detectMode(buffer.filepath, inputModeKey));
+    this.filetypeChangeID = buffer.on('changeFilepath', function(filepath, title) {
+      _this.setMode(detectMode(filepath, inputModeKey));
     });
 
     // Detect and set a mode.
@@ -999,8 +999,8 @@
     }
     
     // Listen for filepath changes on the new buffer.
-    this.filetypeChangeID = buffer.on('changeFilepath', function(buffer) {
-      _this.parse = detectMode(buffer.filepath, previewModeKey);
+    this.filetypeChangeID = buffer.on('changeFilepath', function(filepath, title) {
+      _this.parse = detectMode(filepath, previewModeKey);
     });
 
     // Detect and set a mode.
