@@ -189,22 +189,15 @@
    * For line drawing method, see {@link http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html|here}.
    *
    * @todo Tidy up event handling.
-   * @todo Add key command to preview all links at the same time.
    * @todo Allow rearrangement of linking order by dragging around the nodes
    *       on the ends of link lines.
-   * @todo Rename .valid-target class to .link-endpoint class, to be more semantic
-   *       when displaying both link lines and link display lines.
-   * @todo Edit CSS rules so that node size on both link lines and link display lines
-   *       rely on the new .link-endpoint class, not :last-child or other methods.
-   *       This is important, as without it we can't style the whole link map at once
-   *       (since there is only one :last-child, and potentially more than one end node).
    * 
    * @constructor
    * @param {Pane} pane - The pane to attach the status light to.
    */
   function StatusLight(pane) {
     var _this = this;
-    var timer;
+    var timer = null;
 
     // Keep a reference to the pane.
     this.pane = pane;
@@ -225,18 +218,20 @@
         this.style.height     = '';
         this.style.opacity    = '';
 
-        // Remove the valid-target class if present.
-        event.target.classList.remove('valid-target');
+        // Remove the link-endpoint class if present.
+        event.target.classList.remove('link-endpoint');
 
         // Remove the line.
         _this.pane.editor.linkLineContainer.removeChild(event.target);
       }
     };
     this.showLinkHoverHandler = function(event) {
-      timer = window.setTimeout(_this.showLink.bind(_this), 150, event);
+      if (!_this.isShowingLink) {
+        timer = window.setTimeout(_this.showLink.bind(_this), 150, event);
+      }
     }
     this.hideLinkHoverHandler = function(event) {
-      if (timer) {
+      if (!_this.isShowingLink && timer) {
         window.clearTimeout(timer);
         timer = null;
         _this.hideLink();
@@ -247,7 +242,7 @@
       event.stopPropagation();
 
       // Break the link and fade out all.
-      _this.hideLink();
+      _this.hideLink(false);
       _this.pane.linkToPane(false);
     };
 
@@ -279,6 +274,9 @@
     pane.infoBar.appendChild(this.linkBar);
     this.linkBar.appendChild(this.linkButton);
     this.linkBar.appendChild(this.linkLight);
+
+    // Update displayed links on pane resize.
+    pane.on('resize', function() { updateDisplayedLinks(pane); });
 
     return this;
   }
@@ -327,11 +325,14 @@
     // Add the start listener again.
     this.linkLight.addEventListener('click', this.startLinkClickHandler);
 
-    // If noLink is true, don't link the panes.
+    // Look for a pane under the cursor and link to it.
     if (makeLink) {
-      // Look for a pane under the cursor and link to it.
       var targetPane = this.pane.editor.getPaneAtCoordinate(this.destinationX, this.destinationY);
       if (targetPane) this.pane.linkToPane(targetPane);
+
+      if (this.pane.editor.container.classList.contains('showing-links')) {
+        updateDisplayedLinks(this.pane);
+      }
     }
   };
 
@@ -347,9 +348,14 @@
     // Don't show the link if it doesn't exist.
     if (!this.pane.linkedPane) return;
 
+    // Set flag.
+    this.isShowingLink = true;
+
     // Add the link line to the document body.
     // This is done first so that offsetWidth can be accessed.
-    fadeIn(this.pane.editor.linkLineContainer, this.linkDisplayLine, 200, 'ease-in');
+    if (!this.linkDisplayLine.parentElement) {
+      fadeIn(this.pane.editor.linkLineContainer, this.linkDisplayLine, 200, 'ease-in');
+    }
 
     // Get the light element's position.
     var source    = this.pane.wrapper;
@@ -372,19 +378,29 @@
     // Position and size the line.
     drawLine(this.linkDisplayLine, origin, destination);
 
+    // Show the line with an endpoint.
+    this.linkDisplayLine.classList.toggle('link-endpoint', !this.pane.linkedPane.linkedPane);
+
     // Recursively show child links.
     if (recursive) this.pane.linkedPane.statusLight.showLink();
   };
 
   /**
    * Fades out the link line added in showLink().
+   *
+   * @param {Boolean} [recursive=true] If true, shows links recursively.
    */
-  StatusLight.prototype.hideLink = function() {
+  StatusLight.prototype.hideLink = function(recursive) {
+    if (typeof recursive === 'undefined') recursive = true;
+
+    // Unset flag.
+    this.isShowingLink = false;
+
     // Remove the display line.
     fadeOut(this.linkDisplayLine, 200, 'ease-in');
 
     // Recursively hide child links.
-    if (this.pane.linkedPane) {
+    if (recursive && this.pane.linkedPane) {
       this.pane.linkedPane.statusLight.hideLink();
     }
   };
@@ -409,14 +425,14 @@
     // Draw the line.
     drawLine(this.linkLine, { x: originX, y: originY }, { x: mouseX, y: mouseY });
 
-    // Toggle the 'invalid-target' class if not hovering over a valid link target.
+    // Toggle the 'inlink-endpoint' class if not hovering over a valid link target.
     // Look for a pane under the cursor and link to it.
     var targetPane = this.pane.editor.getPaneAtCoordinate(this.destinationX, this.destinationY);
 
     if (targetPane) {
-      this.linkLine.classList.toggle('valid-target', this.pane.canLinkToPane(targetPane));
+      this.linkLine.classList.toggle('link-endpoint', this.pane.canLinkToPane(targetPane));
     } else {
-      this.linkLine.classList.remove('valid-target');
+      this.linkLine.classList.remove('link-endpoint');
     }
   };
 
@@ -513,6 +529,23 @@
     line.style.top    = origin.y + 'px';
     line.style.left   = origin.x + 'px';
     line.style.webkitTransform = 'rotate(' + angle + 'deg)';
+  }
+
+  /**
+   * Updates all shown links on panes directly connected to the given pane.
+   *
+   * @param {Pane} pane - The pane to update. Connected panes will have
+   *        their links updated as well.
+   */
+  function updateDisplayedLinks(pane) {
+    var show = pane.editor.container.classList.contains('showing-links');
+    // Update pane.
+    if (show) pane.statusLight.showLink(false);
+
+    // Update connected panes as well.
+    _.forEach(pane.linkingPanes, function(linkingPane) {
+      if (show) linkingPane.statusLight.showLink(false);
+    });
   }
 
 /* =======================================================
@@ -1036,10 +1069,18 @@
    * a display to the user. It also has methods for running user-defineable commands
    * that can extend functionality further.
    *
+   * @todo After creating a key combination class, move the show/hide links
+   *       functionality over to it.
+   * @todo Use a better key than CTRL. Right now it conflicts badly with other
+   *       common key combinations. (Though using a timeout does help.)
+   *
    * @constructor
    * @param {String} containerID - The id of the element to insert the editor into.
    */
   function Editor(containerID) {
+    var _this = this;
+    var timeout = null;
+
     // Get the editor's container and start with no panes.
     this.container = document.getElementById('editor');
     this.panes = [];
@@ -1052,6 +1093,42 @@
     this.linkLineContainer = document.createElement('div');
     this.linkLineContainer.className = 'link-line-container';
     document.body.appendChild(this.linkLineContainer);
+
+    // On CTRL press, show all pane links.
+    this.container.addEventListener('keydown', function(event) {
+      // Only proceed on CTRL keypress.
+      if (event.keyCode !== 17) return;
+
+      // Execute the function after a timeout.
+      timeout = setTimeout(function() {
+        // Add a class to display state.
+        _this.container.classList.add('showing-links');
+
+        // Show all links.
+        _.forEach(_this.panes, function(pane) {
+          pane.statusLight.showLink(false);
+        });
+      }, 500);
+    });
+
+    // On CTRL release, hide all links again.
+    this.container.addEventListener('keyup', function(event) {
+      // Only proceed on CTRL keypress.
+      if (event.keyCode !== 17) return;
+
+      if (timeout) {
+        // Clear the timeout.
+        clearTimeout(timeout);
+
+        // Remove the class.
+        _this.container.classList.remove('showing-links');
+
+        // Hide all links.
+        _.forEach(_this.panes, function(pane) {
+          pane.statusLight.hideLink(false);
+        });
+      }
+    });
 
     return this;
   }
