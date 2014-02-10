@@ -245,6 +245,8 @@
    * @todo Currently this only works with relative filepaths.
    *       When the python API is implemented it will allow a simple method
    *       of checking for absolute filepaths.
+   * @todo When recursively creating a new directory, only the end directory
+   *       is deleted again when cancelling. All created directories should be.
    *
    * @param {Editor.pane} pane - The pane to open the file in.
    * @param {String} path - The path to save to. If not specified,
