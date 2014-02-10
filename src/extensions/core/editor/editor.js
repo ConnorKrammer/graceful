@@ -2069,8 +2069,8 @@
     if (!this.hasText()) return;
 
     // Get the text content and clear the input.
-    var text = this.element.textContent;
-    this.element.textContent = '';
+    var text = this.element.innerText;
+    this.element.innerText = '';
 
     // Run entered text as a command.
     runCommand(text, this.dictionary, this.pane, this.history);
