@@ -1656,6 +1656,91 @@
   };
 
   /**
+   * Run the specified command or array of commands. Commands can be passed in as
+   * either a string to be parsed (as from the command bar) or as an array of such strings.
+   *
+   * Note that if one of the commands fail, any following commands will be skipped.
+   *
+   * @todo Allow the pane to be changed dynamically by certain commands (important for ones
+   *       that might add or remove panes). Implementation should take the pane argument
+   *       as a function that would return the proper pane to execute on.
+   * @todo Emphasize somewhere that there must be a focused pane at all times.
+   *
+   * @param {String|String[]} list - A command string to parse, or an array of command strings.
+   * @param {Pane} pane - The pane to run the commands on.
+   * @return {Promise} A promise chain for all the commands.
+   */
+  Editor.prototype.runCommand = function(list, pane) {
+    var deferred = Q.defer();
+
+    // If no pane is specified, reject the promise.
+    if (!pane) {
+      deferred.reject(new Error('Editor.runCommand() requires a pane to operate on.'));
+      return deferred.promise;
+    }
+
+    // Get command definitions.
+    var dictionary = this.commandDictionary;
+
+    // Parse out an array of commands from the list.
+    var commands = _([].concat(list))
+      .map(function(string) { return parseCommand(string, dictionary); }).flatten()
+      .sortBy(function(results) { return results.command.forceLast ? 1 : 0; })
+      .value();
+
+    // Create an item to track command results.
+    var historyItem = { time: new Date() };
+
+    // Setting this to true within the _.reduce() call will skip remaining commands.
+    var failHard = false;
+
+    // Save a record of the commands.
+    this.commandHistory.push(historyItem);
+
+    // Run through the commands in order.
+    var promise = _.reduce(commands, function(promiseChain, commandInfo, index) {
+      var command = commandInfo.command;
+      var args = [pane].concat(commandInfo.args);
+
+      // Wait for any returned promises to resolve before continuing.
+      return Q.when(promiseChain, function() {
+        historyItem[index] = {
+          name: command.name,
+          result: 'Succeeded'
+        };
+
+        // There was an error: skip remaining commands.
+        if (failHard) throw new Error();
+
+        return command.func.apply(null, args);
+      })
+      .fail(function(error) {
+        if (command.func === failCommand) {
+          historyItem[index].result = 'Unrecognized';
+        }
+        else if (failHard) {
+          historyItem[index].result = 'Skipped';
+        }
+        else {
+          historyItem[index].result = 'Failed: ' + error.message;
+        }
+
+        if (!failHard) {
+          Utils.printFormattedError("Editor command '" + command.name
+            + "' failed with error:", error);
+        }
+
+        // Skip remaining commands.
+        failHard = true;
+      });
+    }, null);
+
+    // Resolve the promise and return.
+    deferred.resolve(promise);
+    return deferred.promise;
+  };
+
+  /**
    * Divides up the space evenly among panes in the given direction.
    *
    * @param {Editor} editor - The editor to resize panes from.
@@ -1849,78 +1934,7 @@
       .value();
 
     return value.length ? value : false;
-  }
-
-  /**
-   * Run the specified command or array of commands. Commands can be passed in as
-   * either a string to be parsed (as from the command bar) or as an array of such strings.
-   *
-   * Note that if one of the commands fail, any following commands will be skipped.
-   *
-   * @todo Allow the pane to be changed dynamically by certain commands (important for ones
-   *       that might add or remove panes). Implementation should take the pane argument
-   *       as a function that would return the proper pane to execute on.
-   * @todo Emphasize somewhere that there must be a focused pane at all times.
-   *
-   * @param {String|String[]} list - A command string to parse, or an array of command strings.
-   * @param {Object} dictionary - A hash table mapping command names to Command objects.
-   * @param {Pane} pane - The pane to run the commands on.
-   * @param {Object[]} [history] - An array of history objects to append the run results to.
-   */
-   function runCommand(list, dictionary, pane, history) {
-     // Parse out an array of commands from the list.
-     var commands = _([].concat(list))
-       .map(function(string) { return parseCommand(string, dictionary); }).flatten()
-       .sortBy(function(results) { return results.command.forceLast ? 1 : 0; })
-       .value();
-
-     // Create an item to track command results.
-     var historyItem = { time: new Date() };
-
-     // Setting this to true within the _.reduce() call will skip remaining commands.
-     var failHard = false;
-
-     // Save a record of the commands if requested.
-     if (history) history.push(historyItem);
-
-     // Run through the commands in order.
-     _.reduce(commands, function(promiseChain, commandInfo, index) {
-       var command = commandInfo.command;
-       var args = [pane].concat(commandInfo.args);
-
-       // Wait for any returned promises to resolve before continuing.
-       return Q.when(promiseChain, function() {
-         historyItem[index] = {
-           name: command.name,
-              result: 'Succeeded'
-         };
-
-         // There was an error: skip remaining commands.
-         if (failHard) throw new Error();
-
-         return command.func.apply(null, args);
-       })
-       .fail(function(error) {
-         if (command.func === failCommand) {
-           historyItem[index].result = 'Unrecognized';
-         }
-         else if (failHard) {
-           historyItem[index].result = 'Skipped';
-         }
-         else {
-           historyItem[index].result = 'Failed: ' + error.message;
-         }
-
-         if (!failHard) {
-           Utils.printFormattedError("Editor command '" + command.name
-             + "' failed with error:", error);
-         }
-
-         // Skip remaining commands.
-         failHard = true;
-       });
-     }, null);
-   }
+  };
 
 /* =======================================================
  *                      CommandBar
@@ -1990,8 +2004,6 @@
     // Keep references.
     this.pane       = pane;
     this.element    = element;
-    this.dictionary = pane.editor.commandDictionary;
-    this.history    = pane.editor.commandHistory;
 
     return this;
   }
@@ -2060,9 +2072,7 @@
   };
 
   /**
-   * Parses input into Command objects and runs them with the supplied 
-   * arguments. Commands are looked up in the command dictionary, and
-   * the run result of each command is recorded in the history array.
+   * Runs the contents of the command bar as commands.
    */
   CommandBar.prototype.runCommands = function() {
     // Exit if there isn't any text entered.
@@ -2073,7 +2083,7 @@
     this.element.innerText = '';
 
     // Run entered text as a command.
-    runCommand(text, this.dictionary, this.pane, this.history);
+    this.pane.editor.runCommand(text, this.pane);
   };
 
   /**
