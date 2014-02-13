@@ -808,7 +808,7 @@
       pane.addLinkingPane(this);
     } else {
       // Make the pane cycleable again.
-      this.isAnchored = true;
+      this.isAnchored = false;
 
       // Switch to a new buffer.
       this.switchBuffer(new Buffer());
