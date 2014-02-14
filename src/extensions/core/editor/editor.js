@@ -1253,6 +1253,7 @@
     var sibling          = pane.wrapper.previousElementSibling || pane.wrapper.nextElementSibling;
     var containerParent  = container.parentElement;
     var containerSibling = container.previousElementSibling || container.nextElementSibling;
+    var shouldRefocus    = this.hasFocusedPane() ? pane === this.getFocusPane() : false;
     var newFocus;
 
     // Separate cases are needed for cases including vertical splitters.
@@ -1296,8 +1297,10 @@
     }
 
     // Focus another pane.
-    newFocus = _.find(this.panes, { 'type': 'input' }) || this.panes[0];
-    newFocus.focus();
+    if (shouldRefocus) {
+      newFocus = _.find(this.panes, { 'type': 'input' }) || this.panes[0];
+      newFocus.focus();
+    }
   };
 
   /**
@@ -1529,6 +1532,15 @@
   };
 
   /**
+   * Checks for the presence of a focused pane.
+   *
+   * @return {Boolean} Whether the editor has a focused pane.
+   */
+  Editor.prototype.hasFocusedPane = function() {
+    return this.getFocusPane() ? true : false;
+  }
+
+  /**
    * Returns the focused pane.
    *
    * @return {Pane|False} The focused pane, or false if no pane has focus.
@@ -1567,40 +1579,56 @@
   /**
    * Defines a command.
    *
-   * @param {String}   name      - The name of the command.
-   * @param {Integer}  argCount  - The number of arguments the command function accepts.
-   * @param {Function} func      - The function the command invokes.
-   * @param {String}   delimeter - The delimeter between function arguments.
-   * @param {Boolean}  forceLast - Whether the command should be pushed to the end
-   *                               of the call list when several commands are run
-   *                               sequentially.
-   * @return {Boolean} Returns false if the command already exists or contains
-   *         whitespace, otherwise true.
+   * This mostly just passes options on to the Command constructor,
+   * but implements safety checks and doesn't allow an alias to be
+   * set. For creating an alias command, consider using Editor.aliasCommand().
+   *
+   * For practical reasons, command names may not contain whitespace.
+   * This function will not redefine existing commands.
+   *
+   * @param {Object}   config                   - A configuration object.
+   * @param {String}   config.name              - The name of the command.
+   * @param {Function} config.func              - The function the command invokes.
+   * @param {Integer}  [config.argCount=0]      - The number of arguments the command function accepts.
+   * @param {String}   [config.delimeter=' ']   - The delimeter between function arguments.
+   * @param {Boolean}  [config.forceLast=false] - Whether the command should be pushed to the end
+   *                                              of the call list when several commands are run sequentially.
+   * @param {Function} [config.focusFunc]       - A function taking an editor instance and returning a new pane
+   *                                              to pass focus to after executing the command.
+   *
+   * @return {Boolean} Returns false if the command definition is invalid, otherwise true.
    */
-  Editor.prototype.defineCommand = function(name, argCount, func, delimeter, forceLast) {
+  Editor.prototype.defineCommand = function(config) {
+    // Command definition must include a name and function.
+    if (typeof config.name === 'undefined' || typeof config.func === 'undefined') {
+      console.log("Command definition requires a name and a function.");
+      return false;
+    }
+
     // Trim whitespace.
-    name = name.trim();
+    config.name = config.name.trim();
 
     // Don't allow whitespace in name.
-    if (/\s/g.test(name)) {
-      console.log("Command '" + name + "' cannot contain whitepace in name.");
+    if (/\s/g.test(config.name)) {
+      console.log("Command '" + config.name + "' cannot contain whitepace in name.");
       return false;
     }
 
     // Don't overwrite an existing command.
-    if (this.commandDictionary[name]) {
-      console.log("Command '" + name + "' already exists!");
+    if (this.commandDictionary[config.name]) {
+      console.log("Command '" + config.name + "' already exists!");
+      return false;
+    }
+
+    // Don't allow command aliasing.
+    if (typeof config.aliasOf !== 'undefined') {
+      console.log("Cannot define aliased command in Editor.defineCommand().\n"
+          + "Use Editor.aliasCommand() instead.");
       return false;
     }
 
     // Define the command.
-    this.commandDictionary[name] = new Command({
-      name: name,
-      argCount: argCount,
-      func: func,
-      delimeter: delimeter,
-      forceLast: forceLast
-    });
+    this.commandDictionary[config.name] = new Command(config);
 
     return true;
   };
@@ -1660,11 +1688,7 @@
    * either a string to be parsed (as from the command bar) or as an array of such strings.
    *
    * Note that if one of the commands fail, any following commands will be skipped.
-   *
-   * @todo Allow the pane to be changed dynamically by certain commands (important for ones
-   *       that might add or remove panes). Implementation should take the pane argument
-   *       as a function that would return the proper pane to execute on.
-   * @todo Emphasize somewhere that there must be a focused pane at all times.
+   * After running a command there should generally be a focused pane.
    *
    * @param {String|String[]} list - A command string to parse, or an array of command strings.
    * @param {Pane} pane - The pane to run the commands on.
@@ -1672,10 +1696,11 @@
    */
   Editor.prototype.runCommand = function(list, pane) {
     var deferred = Q.defer();
+    var _this = this;
 
     // If no pane is specified, reject the promise.
     if (!pane) {
-      deferred.reject(new Error('Editor.runCommand() requires a pane to operate on.'));
+      deferred.reject(new Error('Editor.runCommand() requires a pane to work with.'));
       return deferred.promise;
     }
 
@@ -1689,7 +1714,7 @@
       .value();
 
     // Create an item to track command results.
-    var historyItem = { time: new Date() };
+    var historyItem = { time: new Date(), count: commands.length };
 
     // Setting this to true within the _.reduce() call will skip remaining commands.
     var failHard = false;
@@ -1697,24 +1722,45 @@
     // Save a record of the commands.
     this.commandHistory.push(historyItem);
 
-    // Run through the commands in order.
+    // Run through the commands in order, waiting for any returned promises
+    // to resolve before continuing.
     var promise = _.reduce(commands, function(promiseChain, commandInfo, index) {
-      var command = commandInfo.command;
-      var args = [pane].concat(commandInfo.args);
-
-      // Wait for any returned promises to resolve before continuing.
       return Q.when(promiseChain, function() {
+        // Assign in here so that the pane can be changed between commands.
+        var command = commandInfo.command;
+        var args = [pane].concat(commandInfo.args);
+
+        // Build a history item to track the command.
         historyItem[index] = {
           name: command.name,
-          result: 'Succeeded'
+          result: 'Succeeded',
+          targetPane: pane
         };
 
         // There was an error: skip remaining commands.
         if (failHard) throw new Error();
 
-        return command.func.apply(null, args);
+        // Execute the command.
+        return Q.when(command.func.apply(null, args), function() {
+          var newPane;
+
+          // Re-assign the appropriate pane.
+          if (typeof command.focusFunc === 'function') {
+            newPane = command.focusFunc(_this);
+
+            // Only set the new pane if it's actually a pane.
+            if (newPane instanceof Pane) {
+              pane = newPane;
+              historyItem[index].newTargetPane = pane;
+            }
+          }
+
+          // Focus the pane.
+          pane.focus();
+        });
       })
       .fail(function(error) {
+        // Record the reason for the command failure.
         if (command.func === failCommand) {
           historyItem[index].result = 'Unrecognized';
         }
@@ -1725,6 +1771,7 @@
           historyItem[index].result = 'Failed: ' + error.message;
         }
 
+        // If the command was unrecognized or failed outright, log it.
         if (!failHard) {
           Utils.printFormattedError("Editor command '" + command.name
             + "' failed with error:", error);
@@ -1805,20 +1852,23 @@
    * out of a string to be passed to that function.
    *
    * @constructor
-   * @param {Object}   config           - A configuration object.
-   * @param {String}   config.name      - The name of the command.
-   * @param {Integer}  config.argCount  - The number of arguments the command function accepts.
-   * @param {Function} config.func      - The function the command invokes.
-   * @param {String}   config.delimeter - The delimeter between function arguments.
-   * @param {Boolean}  config.forceLast - Whether the command should be pushed to the end
-   *                                      of the call list when several commands are run sequentially.
-   * @param {String}   config.aliasOf   - A string to alias the command to.
+   * @param {Object}   config                   - A configuration object.
+   * @param {String}   config.name              - The name of the command.
+   * @param {Function} config.func              - The function the command invokes.
+   * @param {Integer}  [config.argCount=0]      - The number of arguments the command function accepts.
+   * @param {String}   [config.delimeter=' ']   - The delimeter between function arguments.
+   * @param {Boolean}  [config.forceLast=false] - Whether the command should be pushed to the end
+   *                                              of the call list when several commands are run sequentially.
+   * @param {Function} [config.focusFunc]       - A function taking an editor instance and returning a new pane
+   *                                              to pass focus to after executing the command.
+   * @param {String}   [config.aliasOf]         - A string to alias the command to.
    */
   function Command(config) {
     this.name = config.name;
     this.argCount  = config.argCount;
     this.delimeter = config.delimeter || ' ';
     this.forceLast = config.forceLast || false;
+    this.focusFunc = config.focusFunc;
 
     if (config.aliasOf) this.aliasOf = config.aliasOf;
     else this.func = config.func;

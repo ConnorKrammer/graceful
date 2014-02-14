@@ -322,9 +322,13 @@
    * The command gives other commands priority.
    */
   graceful.onLoad(function() {
-    graceful.editor.defineCommand('mini', 0, function(pane) {
-      var minimap = new MiniMap(pane);
-    }, null, true);
+    graceful.editor.defineCommand({
+      name: 'mini',
+      forceLast: true,
+      func: function(pane) {
+        var minimap = new MiniMap(pane);
+      }
+    });
   });
 }(this);
 

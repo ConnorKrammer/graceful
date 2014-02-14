@@ -27,9 +27,33 @@
    * @param {Editor.Pane} pane - The pane to link.
    * @param {Integer) paneNumber - The index of the pane to create the link with.
    */
-  graceful.editor.defineCommand('link', 1, function(pane, paneNumber) {
-    paneNumber = parseInt(paneNumber, 10);
-    pane.linkToPane(graceful.editor.panes[paneNumber]);
+  graceful.editor.defineCommand({
+    name: 'link',
+    argCount: 1,
+    func: function(pane, paneNumber) {
+      paneNumber = parseInt(paneNumber, 10);
+      pane.linkToPane(graceful.editor.panes[paneNumber]);
+    }
+  });
+
+  /**
+   * Gives the pane with the specified pane focus.
+   *
+   * @todo Allow a more intuitive way to specify the focused pane.
+   *
+   * @param {Editor.Pane} pane - The pane to give focus to.
+   * @param {Integer) paneNumber - The index of the pane to focus.
+   */
+  graceful.editor.defineCommand({
+    name: 'focus',
+    argCount: 1,
+    func: function(pane, paneNumber) {
+      paneNumber = parseInt(paneNumber, 10) || 0;
+      graceful.editor.panes[paneNumber].focus();
+    },
+    focusFunc: function(editor) {
+      return editor.getFocusPane();
+    }
   });
 
   /**
@@ -59,15 +83,12 @@
     if (link) newPane.linkToPane(pane);
 
     // Allow the transition to finish before subsequent commands can start.
-    pane.wrapper.addEventListener('transitionend', function endListener(event) {
+    newPane.wrapper.addEventListener('transitionend', function endListener(event) {
       if (event.propertyName === property) {
         deferred.resolve();
         pane.wrapper.removeEventListener('transitionend', endListener);
       }
     });
-
-    // Re-focus the pane.
-    pane.focus();
 
     return deferred.promise;
   }
@@ -81,8 +102,12 @@
    *        the pane executing the command.
    * @return {Promise} A promise for the split.
    */
-  graceful.editor.defineCommand('split_h', 2, function(pane, type, link) {
-    return addSplit(pane, 'horizontal', type, link);
+  graceful.editor.defineCommand({
+    name: 'split_h',
+    argCount: 2,
+    func: function(pane, type, link) {
+      return addSplit(pane, 'horizontal', type, link);
+    }
   });
 
   /**
@@ -94,15 +119,22 @@
    *        the pane executing the command.
    * @return {Promise} A promise for the split.
    */
-  graceful.editor.defineCommand('split_v', 2, function(pane, type, link) {
-    return addSplit(pane, 'vertical', type, link);
+  graceful.editor.defineCommand({
+    name: 'split_v',
+    argCount: 2,
+    func: function(pane, type, link) {
+      return addSplit(pane, 'vertical', type, link);
+    }
   });
 
   /**
    * Open up the Chrome developer tools in a new window.
    */
-  graceful.editor.defineCommand('dev', 0, function() {
-    appshell.app.showDeveloperTools();
+  graceful.editor.defineCommand({
+    name: 'dev',
+    func: function() {
+      appshell.app.showDeveloperTools();
+    }
   });
 
   /**
@@ -111,18 +143,30 @@
    *
    * @todo Prompt user to save changes before closing.
    */
-  graceful.editor.defineCommand('quit', 0, function() {
-    appshell.app.closeLiveBrowser();
-    appshell.app.quit();
+  graceful.editor.defineCommand({
+    name: 'quit',
+    func: function() {
+      appshell.app.closeLiveBrowser();
+      appshell.app.quit();
+    }
   });
 
   /**
-   * Closes the focused pane.
+   * Closes the focused pane, or the specified pane.
    *
-   * @param {Editor.Pane} pane - The pane to use remove.
+   * @param {Editor.Pane} pane - The pane to remove.
+   * @param {Integer) paneNumber - The index of the pane to close.
    */
-  graceful.editor.defineCommand('close', 0, function(pane) {
-    graceful.editor.removePane(pane);
+  graceful.editor.defineCommand({
+    name: 'close',
+    argCount: 1,
+    func: function(pane, paneNumber) {
+      pane = paneNumber ? graceful.editor.panes[parseInt(paneNumber, 10)] : pane;
+      graceful.editor.removePane(pane);
+    },
+    focusFunc: function(editor) {
+      return editor.getFocusPane(); 
+    }
   });
 
   /**
@@ -201,42 +245,46 @@
    *
    * @return {Promise} A promise for the open operation.
    */
-  graceful.editor.defineCommand('open', 1, function(pane, path) {
-    var buffer = pane.buffer;
+  graceful.editor.defineCommand({
+    name: 'open',
+    argCount: 1,
+    func: function(pane, path) {
+      var buffer = pane.buffer;
 
-    // Resolve relative filepaths.
-    path = getAbsolutePath(buffer.filepath, path, true) || '';
+      // Resolve relative filepaths.
+      path = getAbsolutePath(buffer.filepath, path, true) || '';
 
-    return FileSystem.pathType(path)
-      .then(function(type) {
-        if (type === 'file') {
-          // If it's an existing file, open it.
-          return FileSystem.readFile(path)
-            .then(function(contents) {
-              pane.switchBuffer(new Editor.Buffer(contents, path), true);
-            });
-        }
-        else if (type === 'directory') {
-          // If it's an existing directory, start the open dialogue there.
-          return FileSystem.showOpenDialog(null, path)
-            .then(function(selection) {
-              return FileSystem.readFile(selection)
-                .then(function(contents) {
-                  pane.switchBuffer(new Editor.Buffer(contents, selection), true);
+      return FileSystem.pathType(path)
+        .then(function(type) {
+          if (type === 'file') {
+            // If it's an existing file, open it.
+            return FileSystem.readFile(path)
+              .then(function(contents) {
+                pane.switchBuffer(new Editor.Buffer(contents, path), true);
               });
-            })
-        }
-        else if (!type || !path) {
-          // If there is no path, start the open dialogue at the last used location.
-          return FileSystem.showOpenDialog()
-            .then(function(selection) {
-              return FileSystem.readFile(selection)
-                .then(function(contents) {
-                  pane.switchBuffer(new Editor.Buffer(contents, selection), true);
+          }
+          else if (type === 'directory') {
+            // If it's an existing directory, start the open dialogue there.
+            return FileSystem.showOpenDialog(null, path)
+              .then(function(selection) {
+                return FileSystem.readFile(selection)
+                  .then(function(contents) {
+                    pane.switchBuffer(new Editor.Buffer(contents, selection), true);
                 });
-            });
-        }
-      });
+              })
+          }
+          else if (!type || !path) {
+            // If there is no path, start the open dialogue at the last used location.
+            return FileSystem.showOpenDialog()
+              .then(function(selection) {
+                return FileSystem.readFile(selection)
+                  .then(function(contents) {
+                    pane.switchBuffer(new Editor.Buffer(contents, selection), true);
+                  });
+              });
+          }
+        });
+    }
   });
 
   /**
@@ -256,71 +304,75 @@
    *
    * @return {Promise} A promise for the save operation.
    */
-  graceful.editor.defineCommand('save', 1, function(pane, path) {
-    var buffer = pane.buffer;
-    var lastChar;
+  graceful.editor.defineCommand({
+    name: 'save',
+    argCount: 1,
+    func: function(pane, path) {
+      var buffer = pane.buffer;
+      var lastChar;
 
-    // Resolve relative filepaths.
-    path     = getAbsolutePath(buffer.filepath, path) || buffer.filepath || '';
-    lastChar = path.slice(-1);
+      // Resolve relative filepaths.
+      path     = getAbsolutePath(buffer.filepath, path) || buffer.filepath || '';
+      lastChar = path.slice(-1);
 
-    return FileSystem.pathType(path)
-      .then(function(type) {
-        if (type === 'file') {
-          // If it's an existing file, overwrite it.
-          return FileSystem.writeFile(path, buffer.text)
-            .then(function() {
-              buffer.setFilepath(path);
-            });
-        }
-        else if (type === 'directory') {
-          // If it's an existing directory, open the save dialogue there.
-          return FileSystem.showSaveDialogue(null, path, buffer.title)
-            .then(function(selection) {
-              return FileSystem.writeFile(selection, buffer.text)
-                .then(function() {
-                  buffer.setFilepath(selection);
-                });
-            });
-        }
-        else if (!type && path && (lastChar === '/' || lastChar === '\\')) {
-          // If it's an uncreated directory, create it. If the user cancels, delete it again.
-          return FileSystem.makeDirectory(path)
-            .then(function() {
-              return FileSystem.showSaveDialogue(null, path, buffer.title)
-                .then(function(selection) {
-                  return FileSystem.writeFile(selection, buffer.text)
-                    .then(function() {
-                      buffer.setFilepath(selection);
-                    });
-                })
-                .fail(function(error) {
-                  FileSystem.unlink(path);
-                });
-            });
-        }
-        else if (!type && path) {
-          // If an uncreated file is specified, recursively create the filepath and save it.
-          return FileSystem.writeFileRecursive(path, buffer.text)
-            .then(function() {
-              buffer.setFilepath(path);
-            });
-        }
-        else if (!path && buffer.filepath) {
-          // If no path was specified but the buffer is associated with a filepath, save it there.
-          return FileSystem.writeFile(buffer.filepath, buffer.text);
-        }
-        else if (!path) {
-          // If no path is specified, open the save dialogue at the last used location.
-          return FileSystem.showSaveDialogue(null, null, buffer.title)
-            .then(function(selection) {
-              return FileSystem.writeFile(selection, buffer.text)
-                .then(function() {
-                  buffer.setFilepath(selection);
-                });
-            });
-        }
-      });
+      return FileSystem.pathType(path)
+        .then(function(type) {
+          if (type === 'file') {
+            // If it's an existing file, overwrite it.
+            return FileSystem.writeFile(path, buffer.text)
+              .then(function() {
+                buffer.setFilepath(path);
+              });
+          }
+          else if (type === 'directory') {
+            // If it's an existing directory, open the save dialogue there.
+            return FileSystem.showSaveDialogue(null, path, buffer.title)
+              .then(function(selection) {
+                return FileSystem.writeFile(selection, buffer.text)
+                  .then(function() {
+                    buffer.setFilepath(selection);
+                  });
+              });
+          }
+          else if (!type && path && (lastChar === '/' || lastChar === '\\')) {
+            // If it's an uncreated directory, create it. If the user cancels, delete it again.
+            return FileSystem.makeDirectory(path)
+              .then(function() {
+                return FileSystem.showSaveDialogue(null, path, buffer.title)
+                  .then(function(selection) {
+                    return FileSystem.writeFile(selection, buffer.text)
+                      .then(function() {
+                        buffer.setFilepath(selection);
+                      });
+                  })
+                  .fail(function(error) {
+                    FileSystem.unlink(path);
+                  });
+              });
+          }
+          else if (!type && path) {
+            // If an uncreated file is specified, recursively create the filepath and save it.
+            return FileSystem.writeFileRecursive(path, buffer.text)
+              .then(function() {
+                buffer.setFilepath(path);
+              });
+          }
+          else if (!path && buffer.filepath) {
+            // If no path was specified but the buffer is associated with a filepath, save it there.
+            return FileSystem.writeFile(buffer.filepath, buffer.text);
+          }
+          else if (!path) {
+            // If no path is specified, open the save dialogue at the last used location.
+            return FileSystem.showSaveDialogue(null, null, buffer.title)
+              .then(function(selection) {
+                return FileSystem.writeFile(selection, buffer.text)
+                  .then(function() {
+                    buffer.setFilepath(selection);
+                  });
+              });
+          }
+        });
+    }
   });
 
 /* =======================================================
