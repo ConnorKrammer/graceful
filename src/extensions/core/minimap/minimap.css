@@ -1,17 +1,16 @@
 /* This file includes the CSS styles for the graceful-minimap plugin. */
 
 /* The minimap's topmost parent object.
- * Setting the scale factor on this resizes the whole
- * minimap, but the height will need to be changed to compensate, 
- * as well the height on the minimap-overlay object. */
+ * max-width and padding match CodeMirror.
+ * height is equal to 100% / scale. */
 .minimap {
   position: absolute;
   top: 0;
   right: 10px;
   width: 100%;
-  height: 400%;            /* 100% / scale                                  */
-  max-width: 800px;        /* Matches the CodeMirror max-width.             */
-  padding: 4px 0 4px 15px; /* Makes the inner width the same as CodeMirror. */
+  height: 400%;
+  max-width: 800px;
+  padding: 4px 15px;
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
@@ -23,29 +22,32 @@
   overflow: hidden;
 }
 
+/* padding is to make inner dimensions the same as CodeMirror.
+ * tab-size is to match how tabs are rendered in the overlay. */
 .minimap-inner {
   width: 100%;
   margin: 0 auto;
-  padding: 4px; /* Makes the inner dimensions the same as CodeMirror. */
+  padding: 4px;
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
   opacity: 0.2;
-  tab-size: 4; /* To match how tabs are rendered in the overlay. */
+  tab-size: 4;
 }
 
 .minimap-inner > span {
   color: #000;
 }
 
+/* height is equal to 100% * scale.
+ * This would have padding: 4px if the border didn't take up
+ * interior space due to box-sizing: border-box being set. */
 .minimap-overlay {
   position: absolute;
   width: 100%;
-  height: 25%; /* 100% * scale */
+  height: 25%;
   top: 0;
   left: 0;
-  padding: 0 0 0 9px; /* Makes the inner width the same as CodeMirror (see .minimap above).
-                       * Note that the side padding would be 4px more if not for the border. */
   border: 4px solid black;
   background: rgb(250, 250, 250);
   overflow-y: hidden;
@@ -68,13 +70,12 @@
  * is enabled, keeping it centered between the edge of
  * the pane and the minimap. */
 .minimap-on .CodeMirror {
-  padding-right: 200px !important; /* minimap's max-width * scale                                 */
-  max-width: 1000px !important;    /* minimap's max-width * (1 + scale) + CodeMirror padding-left */
+  -webkit-transform: translate(-100px, 0); /* -(minimap's max-width * scale) / 2 */
 }
 
 /* Transition the editor's position when toggling the minimap. */
 .CodeMirror {
-  transition-property: padding-right, max-width;
+  transition-property: transform;
   transition-timing-function: ease;
   transition-duration: 0.5s;
 }

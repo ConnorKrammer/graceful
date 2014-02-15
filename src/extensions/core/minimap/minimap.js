@@ -42,9 +42,6 @@
     inner.className   = 'minimap-inner';
     overlay.className = 'minimap-overlay';
 
-    // Set the top margin of the overlay.
-    overlay.style.marginTop = "0px";
-
     // Construct the map.
     pane.wrapper.appendChild(minimap);
     minimap.appendChild(inner);
@@ -70,10 +67,10 @@
 
     // Drag information.
     this.dragInfo = {
-      dragHandler: _.throttle(function(event) {
+      dragHandler: function(event) {
         _this.dragHandler(event);
         _this.updateContent();
-      }, 20),
+      },
       isDrag: false,
       lastY: 0,
       deltaY: 0
@@ -113,6 +110,9 @@
     this.overlay = overlay;
     this.preview = preview;
     this.scale   = scale;
+
+    // For tracking the scroll position.
+    this.scrollPosition = {};
 
     // Update everything.
     this.update(true, true, true);
@@ -160,7 +160,7 @@
    * @param {Event} event - A mousemove event.
    */
   MiniMap.prototype.dragHandler = function(event) {
-    var currentTop, nextTop, scrollInfo, height, clientHeight, scrollPercent, scrollPosition;
+    var nextTop, scrollInfo, height, clientHeight, scrollPercent, scrollPosition;
 
     // Do nothing if this isn't a drag.
     if (!this.dragInfo.isDrag) return; 
@@ -170,8 +170,7 @@
     this.dragInfo.lastY = event.screenY;
 
     // Get the next position based on the mouse delta.
-    currentTop = parseFloat(this.overlay.style.marginTop);
-    nextTop    = currentTop - (this.dragInfo.deltaY / this.scale);
+    nextTop = this.scrollPosition.overlay - (this.dragInfo.deltaY / this.scale);
 
     // Get scroll information.
     scrollInfo   = this.cm.getScrollInfo();
@@ -216,19 +215,23 @@
     this.cm.scrollTo(null, scrollTop);
     scrollPercent = scrollTop / (scrollMax);
 
-    // Position the overlay.
+    // Calculate the position.
     if (clientHeight >= height) {
-      this.overlay.style.marginTop = 0;
-      this.inner.style.marginTop   = 0;
+      this.scrollPosition.overlay = 0;
+      this.scrollPosition.inner = 0;
     }
     else if (clientHeight / this.scale > height) {
-      this.overlay.style.marginTop = (scrollMax) * scrollPercent + "px";
-      this.inner.style.marginTop = 0;
+      this.scrollPosition.overlay = (scrollMax) * scrollPercent;
+      this.scrollPosition.inner = 0;
     }
     else {
-      this.overlay.style.marginTop = (clientHeight / this.scale - clientHeight) * scrollPercent + "px";
-      this.inner.style.marginTop   = (height - (clientHeight / this.scale)) * -scrollPercent + "px";
+      this.scrollPosition.overlay = (clientHeight / this.scale - clientHeight) * scrollPercent;
+      this.scrollPosition.inner = (height - (clientHeight / this.scale)) * -scrollPercent;
     }
+
+    // Position the minimap.
+    this.overlay.style.webkitTransform = 'translate(0, ' + this.scrollPosition.overlay + 'px)';
+    this.inner.style.webkitTransform = 'translate(0, ' + this.scrollPosition.inner + 'px)';
   };
 
   /**
