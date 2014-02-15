@@ -56,26 +56,17 @@
     scale = parseFloat(getComputedStyle(minimap).webkitTransform.match(regex)[0]);
 
     // Update the display on resize.
-    pane.on('resize', _.throttle(function() {
-      _this.updateDisplay();
-    }, 50));
+    pane.on('resize', _.throttle(function() { _this.updateDisplay(); }, 50));
 
     // Update the content when text changes.
     // Not throttled, since the change event already is.
-    pane.on('change', function() {
-      _this.updateContent();
-      _this.updateInnerContent();
-    });
+    pane.on('change', function() { _this.update(true, true); });
+
+    // Reset everything if the pane switches its buffer.
+    pane.on('changeBuffer', function() { _this.update(true, true, true); });
 
     // Update content when scrolling.
     pane.cm.on('scroll', _.throttle(function() { _this.updateContent(); }, 50));
-
-    // Reset everything if the pane switches its buffer.
-    pane.cm.on('swapDoc', function() {
-      _this.updateContent();
-      _this.updateInnerContent();
-      _this.updateDisplay();
-    });
 
     // Drag information.
     this.dragInfo = {
@@ -124,9 +115,7 @@
     this.scale   = scale;
 
     // Update everything.
-    this.updateContent();
-    this.updateInnerContent();
-    this.updateDisplay();
+    this.update(true, true, true);
 
     // Start at opacity = 0, then trigger reflow.
     minimap.style.transition = 'none';
@@ -144,6 +133,19 @@
 
     return this;
   }
+
+  /**
+   * Convenience method to batch update types.
+   *
+   * @param {Boolean} [content=false]      - Whether or not to call updateContent().
+   * @param {Boolean} [innerContent=false] - Whether or not to call updateInnerContent().
+   * @param {Boolean} [display=false]      - Whether or not to call updateDisplay().
+   */
+  MiniMap.prototype.update = function(content, innerContent, display) {
+    if (content)      this.updateContent();
+    if (innerContent) this.updateInnerContent();
+    if (display)      this.updateDisplay();
+  };
 
   /**
    * Updates the minimap's position to match the editor's position.
