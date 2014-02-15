@@ -27,9 +27,9 @@
  	- The target here is for the ease of mind that Google Drive grants.
 
  - Allow the user more configuration options, such as tab width, maximum 
-   number of panes (columns and rows), autosave frequency, etc. *These should 
-   be smart defaults that ideally would never be changed except by advanced 
-   users with particular needs.*
+   number of panes (columns and rows), autosave frequency, etc. *These 
+   should be smart defaults that ideally would never be changed except by 
+   advanced users with particular needs.*
  
  - Spell checking.
  
@@ -57,8 +57,8 @@
       simple as possible?
      
  - Create a C++ binding that allows execution of shell commands. The main 
-   usage here would be for utilities that expand the app in ways difficult or 
-   slow to do in Javascript.
+   usage here would be for utilities that expand the app in ways difficult 
+   or slow to do in Javascript.
  	- This would also allow certain tasks to be delegated to sub-processes, 
       essentially enabling a sort of multi-threading.
  	- It would also open doors to application scripting, though what that 
