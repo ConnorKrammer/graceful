@@ -25,7 +25,7 @@
    */
   function MiniMap(pane) {
     var _this = this;
-    var cm, minimap, inner, overlay, preview, regex, scale;
+    var cm, minimap, inner, overlay, preview, regex, scale, borderWidth;
 
     // Exit early if it isn't an input pane.
     if (pane instanceof Editor.InputPane === false) return;
@@ -51,6 +51,9 @@
     // For calculating mini-map size.
     regex = /([0-9]+(?:\.[0-9]*)?)/; // Matches the first number.
     scale = parseFloat(getComputedStyle(minimap).webkitTransform.match(regex)[0]);
+
+    // Get the border width. Assume all sides are the same thickness.
+    borderWidth = parseInt(getComputedStyle(overlay).borderLeftWidth, 10);
 
     // Update the display on resize.
     pane.on('resize', _.throttle(function() { _this.updateDisplay(); }, 50));
@@ -110,6 +113,7 @@
     this.overlay = overlay;
     this.preview = preview;
     this.scale   = scale;
+    this.borderWidth = borderWidth;
 
     // For tracking the scroll position.
     this.scrollPosition = {};
@@ -229,9 +233,19 @@
       this.scrollPosition.inner = (height - (clientHeight / this.scale)) * -scrollPercent;
     }
 
+    // Round to nearest multiple of the border width to prevent sub-pixel rendering errors.
+    this.overlay.style.height = Math.round(clientHeight) - (Math.round(clientHeight) % this.borderWidth) + 'px';
+
+    // Round here for the same reason.
+    // Don't round when scrolling is at max, as that can cause a small gap
+    // between the minimap and the pane's edge.
+    if (scrollPercent !== 1) {
+      this.scrollPosition.overlay = Math.round(this.scrollPosition.overlay) - (Math.round(this.scrollPosition.overlay) % this.borderWidth);
+    }
+    
     // Position the minimap.
     this.overlay.style.webkitTransform = 'translate(0, ' + this.scrollPosition.overlay + 'px)';
-    this.inner.style.webkitTransform = 'translate(0, ' + this.scrollPosition.inner + 'px)';
+    this.inner.style.webkitTransform   = 'translate(0, ' + this.scrollPosition.inner   + 'px)';
   };
 
   /**
@@ -276,7 +290,9 @@
    */
   MiniMap.prototype.updateDisplay = function() {
     var wrapper         = this.pane.wrapper;
-    var measureTarget   = !wrapper.parentElement.classList.contains('splitter') ? wrapper : wrapper.parentElement;
+    var measureTarget   = wrapper.parentElement.classList.contains('vertical-splitter-pane')
+      ? wrapper.parentElement
+      : wrapper;
     var panePercent     = parseFloat(measureTarget.style.width, 10) / 100;
     var paneParentWidth = parseFloat(getComputedStyle(measureTarget.parentElement).width, 10);
     var paneWidth       = panePercent * paneParentWidth;
