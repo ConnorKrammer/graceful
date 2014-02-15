@@ -1,0 +1,75 @@
+# Todo:
+
+ - Allow a way to get panes by physical order, not order added. Some 
+   suggestions include:
+ 	- (column, row) notation
+    - Counting from top to bottom and left to right
+    - A two digit variation of (column, row), where the first digit is the 
+      column and the second digit is the row. 
+      
+ - User prompts. This is important for requesting that unsaved changes be 
+   saved before quiting the application.
+   
+ - Make opening and saving files work with absolute filepaths again.
+ 
+ - Allow output from the command bar, much in the way that Vim handles it.
+ 
+ - When creating a vertical or horizontal split, insert the split 
+   immediately after the focused pane.
+ 	- If the pane is larger than ~80% of the total editor size, simply 
+      divide the correct dimension in half without resizing other panes.
+ 	- One option might be to allow the user to specify the exact place that 
+      the new pane would be inserted to, using the same coordinate system as 
+      proposed above. If left unspecified, the default would be to use the 
+      focused pane.
+    
+ - Implement automatic file backups.
+ 	- The target here is for the ease of mind that Google Drive grants.
+
+ - Allow the user more configuration options, such as tab width, maximum 
+   number of panes (columns and rows), autosave frequency, etc. *These should 
+   be smart defaults that ideally would never be changed except by advanced 
+   users with particular needs.*
+ 
+ - Spell checking.
+ 
+ - Allow scrolling past the end of a file.
+ 
+ - Smarter auto-indent.
+ 
+ - Smooth scrolling.
+ 	- This will require looking into how Brackets does it (if they do at 
+      all), and whether CEF allows that sort of thing to be configured.
+      
+ - Faster input processing. Holding down keys (especially delete and 
+   backspace) lags the input fairly noticeably.
+   - A fork of CodeMirror that strips out non-webkit functionality might be 
+     in order, depending on whether or not performance would actually be 
+     improved. As of now, such an action would likely be more work than it's 
+     worth.
+     
+ - Implement user-configureable key commands.
+ 
+ - Allow links to be rearranged by dragging around the nodes shown during a 
+   global link preview.
+ 	- Some significant thought will have to go into the UX here. What 
+      functionality is most needed/desired, and how can we make that as 
+      simple as possible?
+     
+ - Create a C++ binding that allows execution of shell commands. The main 
+   usage here would be for utilities that expand the app in ways difficult or 
+   slow to do in Javascript.
+ 	- This would also allow certain tasks to be delegated to sub-processes, 
+      essentially enabling a sort of multi-threading.
+ 	- It would also open doors to application scripting, though what that 
+      would even be useful for would need to be considered.
+
+ - Allow the user to save and restore custom pane layouts.
+ 
+ - Add in session management.
+ 
+ - Overall, implement performance improvements. The whole damn thing should 
+   be as smooth as silk, and faster than you can think.
+ 
+     
+     
