@@ -90,7 +90,7 @@
       _this.text = doc.getValue();
       _this.markClean(false);
       _this.trigger('change', [_this]);
-    }, 20));
+    }, 50));
 
     return this;
   }
