@@ -754,6 +754,7 @@
     // Set the new buffer.
     this.buffer = buffer;
     this.trigger('changeBuffer', [buffer]);
+    this.trigger('change');
 
     this.titleElement.textContent = buffer.title;
 
@@ -762,9 +763,19 @@
       oldBuffer.off(this.titleChangeID);
     }
 
+    // Stop tracking the old buffer's content changes.
+    if (typeof this.contentChangeID !== 'undefined') {
+      oldBuffer.off(this.contentChangeID);
+    }
+
     // Track the new buffer's title.
     this.titleChangeID = buffer.on('changeFilepath', function(filepath, title) {
       _this.titleElement.textContent = title;
+    });
+
+    // Track the new buffer's title.
+    this.titleChangeID = buffer.on('change', function() {
+      _this.trigger('change');
     });
 
     // Return a reference to the old buffer.

@@ -61,10 +61,11 @@
     }, 50));
 
     // Update the content when text changes.
-    pane.cm.on('change', _.throttle(function() {
+    // Not throttled, since the change event already is.
+    pane.on('change', function() {
       _this.updateContent();
       _this.updateInnerContent();
-    }, 10));
+    });
 
     // Update content when scrolling.
     pane.cm.on('scroll', _.throttle(function() { _this.updateContent(); }, 50));
