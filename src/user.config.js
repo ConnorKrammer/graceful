@@ -249,10 +249,11 @@
     name: 'open',
     argCount: 1,
     func: function(pane, path) {
-      var buffer = pane.buffer;
+      var bufferList = pane.editor.bufferList;
+      var buffer;
 
       // Resolve relative filepaths.
-      path = getAbsolutePath(buffer.filepath, path, true) || '';
+      path = getAbsolutePath(pane.buffer.filepath, path, true) || '';
 
       return FileSystem.pathType(path)
         .then(function(type) {
@@ -260,7 +261,8 @@
             // If it's an existing file, open it.
             return FileSystem.readFile(path)
               .then(function(contents) {
-                pane.switchBuffer(new Editor.Buffer(contents, path), true);
+                buffer = bufferList.find(path) || new Editor.Buffer(contents, path);
+                pane.switchBuffer(buffer, true);
               });
           }
           else if (type === 'directory') {
@@ -269,7 +271,8 @@
               .then(function(selection) {
                 return FileSystem.readFile(selection)
                   .then(function(contents) {
-                    pane.switchBuffer(new Editor.Buffer(contents, selection), true);
+                    buffer = bufferList.find(selection) || new Editor.Buffer(contents, selection);
+                    pane.switchBuffer(buffer, true);
                 });
               })
           }
@@ -279,7 +282,8 @@
               .then(function(selection) {
                 return FileSystem.readFile(selection)
                   .then(function(contents) {
-                    pane.switchBuffer(new Editor.Buffer(contents, selection), true);
+                    buffer = bufferList.find(selection) || new Editor.Buffer(contents, selection);
+                    pane.switchBuffer(buffer, true);
                   });
               });
           }

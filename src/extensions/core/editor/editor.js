@@ -9,6 +9,9 @@
 !function(global) {
   'use strict';
 
+  // Counter for buffer IDs.
+  var currentBufferID = 0;
+
   var inputModeKey = 'inputmode';
   var previewModeKey = 'previewmode';
 
@@ -62,9 +65,12 @@
     // Mix in event handling.
     Observable(this);
 
+    // Get a unique ID.
+    this.id = getBufferID();
+
     // Set the initial filepath.
     if (!filepath) {
-      this.title = 'new';
+      this.title = this.id > 0 ? 'new_' + this.id : 'new';
       this.filepath = null;
     } else {
       this.setFilepath(filepath);
@@ -171,6 +177,113 @@
 
     return Preferences.get('filetypes.' + filetype + '.' + key) ||
       Preferences.get('filetypes.default.' + key);
+  };
+
+  /**
+   * Returns a unique buffer ID.
+   */
+  function getBufferID() {
+    return currentBufferID++;
+  }
+
+/* =======================================================
+ *                       BufferList
+ * ======================================================= */
+
+  /**
+   * The BufferList class.
+   *
+   * Holds references to Buffer instances, ensuring that they
+   * are not garbage-collected in cases where no pane is using them.
+   *
+   * Also disallows two buffers from pointing to the same file.
+   *
+   * @constructor
+   */
+  function BufferList() {
+    this.buffers = [];
+
+    return this;
+  }
+
+  /**
+   * Adds the given buffer.
+   *
+   * @param {Buffer} buffer - The buffer to add.
+   * @return {Boolean} True if succesful, or false if a buffer has already
+   *                   been added that is associated with the same file.
+   */
+  BufferList.prototype.addBuffer = function(buffer) {
+    // Only add the buffer if it's associated with a unique file.
+    if (!this.isUnique(buffer)) return false;
+
+    // Add the buffer.
+    this.buffers.push(buffer);
+    return true;
+  };
+
+  /**
+   * Removes the given buffer.
+   *
+   * @param {Buffer} buffer - The buffer to remove.
+   * @return {Boolean} True if the buffer exists, else false.
+   */
+  BufferList.prototype.removeBuffer = function(buffer) {
+    var index = this.buffers.indexOf(buffer);
+
+    // Return false if the buffer wasn't added to begin with.
+    if (index === -1) return false;
+
+    // Remove the buffer.
+    this.buffers.splice(index, 1);
+    return true;
+  };
+
+  /**
+   * Checks whether the given buffer is held in the buffer list.
+   *
+   * Note the difference between this and BufferList.isUnique() - while
+   * isUnique() will check if the buffer filepath is already associated
+   * with a buffer in the buffer list, this function tests if it is the
+   * _exact_ buffer.
+   *
+   * @param {Buffer} buffer - The buffer to check.
+   * @return {Boolean} True if the buffer is held in the buffer list.
+   */
+  BufferList.prototype.hasBuffer = function(buffer) {
+    return this.buffers.indexOf(buffer) !== -1;
+  };
+
+  /**
+   * Finds a buffer with the given filepath.
+   *
+   * @param {String} filepath - The filepath to match against.
+   * @return {Buffer|False} The matching buffer, or false.
+   */
+  BufferList.prototype.find = function(filepath) {
+    return _.find(this.buffers, { filepath: filepath }) || false;
+  };
+
+  /**
+   * Checks if the given buffer is unique compared to buffers already
+   * added to the buffer list.
+   *
+   * @param {Buffer} buffer - The buffer to check.
+   * @return {Boolean} True if the buffer is associated with a unique file, else false.
+   */
+  BufferList.prototype.isUnique = function(buffer) {
+    // The title check is necessary because new buffers have null filepaths.
+    return !_.any(this.buffers, { filepath: buffer.filepath, title: buffer.title });
+  };
+
+  /**
+   * Returns all buffers that have been marked as dirty, or
+   * false if all buffers are clean.
+   *
+   * @return {Buffer[]|False} An array of dirty buffers, or false.
+   */
+  BufferList.prototype.getDirty = function() {
+    return _.filter(this.buffers, { dirty: true }) || false;
   };
 
 /* =======================================================
@@ -768,15 +881,18 @@
       oldBuffer.off(this.contentChangeID);
     }
 
-    // Track the new buffer's title.
+    // Track the new buffer's title changes.
     this.titleChangeID = buffer.on('changeFilepath', function(filepath, title) {
       _this.titleElement.textContent = title;
     });
 
-    // Track the new buffer's title.
+    // Track the new buffer's content changes.
     this.titleChangeID = buffer.on('change', function() {
       _this.trigger('change');
     });
+
+    // Add the new buffer to the buffer list.
+    this.editor.bufferList.addBuffer(buffer);
 
     // Return a reference to the old buffer.
     return oldBuffer;
@@ -1097,6 +1213,7 @@
     // Get the editor's container and start with no panes.
     this.container = document.getElementById('editor');
     this.panes = [];
+    this.bufferList = new BufferList();
 
     // Command-related properties.
     this.commandDictionary = {};
