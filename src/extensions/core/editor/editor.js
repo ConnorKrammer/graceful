@@ -344,7 +344,7 @@
       }
     }
     this.hideLinkHoverHandler = function(event) {
-      if (!_this.isShowingLink && timer) {
+      if (_this.isShowingLink && timer) {
         window.clearTimeout(timer);
         timer = null;
         _this.hideLink();
