@@ -1,18 +1,13 @@
 # Todo:
 
 ###### Urgent:
- - Fix minimap not showing when its pane is in a vertical split.
- 	- This most likely has to do with how resize events are triggered, but 
-      also potentially with which element the minimap uses to calculate 
-      sizing (but only when in a vertical split).
+ - None right now.
     
 ###### Bugs:
- - Fix how the mouse flickers between a text-cursor and the default cursor 
-   when moving it over the input area of a CodeMirror instance.
- 	- It would be a good idea to test if this is specific to Graceful.
+ - None right now.
 
 ###### Short-term:
- - None right now.
+ - Make pane animations more consistent when opening or closing new panes.
  
 ###### Long-term:
 

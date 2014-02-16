@@ -56,7 +56,7 @@
     borderWidth = parseInt(getComputedStyle(overlay).borderLeftWidth, 10);
 
     // Update the display on resize.
-    pane.on('resize', _.throttle(function() { _this.updateDisplay(); }, 50));
+    pane.on('resize', function() { _this.updateDisplay(); });
 
     // Update the content when text changes.
     // Not throttled, since the change event already is.
@@ -66,7 +66,7 @@
     pane.on('changeBuffer', function() { _this.update(true, true, true); });
 
     // Update content when scrolling.
-    pane.cm.on('scroll', _.throttle(function() { _this.updateContent(); }, 50));
+    pane.cm.on('scroll', function() { _this.updateContent(); });
 
     // Drag information.
     this.dragInfo = {
