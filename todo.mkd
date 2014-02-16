@@ -9,8 +9,16 @@
 ###### Short-term:
  - Make pane animations more consistent when opening or closing new panes.
  
+###### CEF-related:
+ - Expose more of the browser native functions to javascript.
+ - Allow firing of native key events via javascript. This would allow form 
+   auto-fill, chainable key combinations, backspacing and moving through 
+   text all via javascript. Purpose: allow a much cleaner way of interacting 
+   with text than the currently horrible setRange/getRange nonsense that is 
+   required.
+   - See [here][1]
+ 
 ###### Long-term:
-
  - Allow a way to get panes by physical order, not order added. Some 
    suggestions include:
  	- (column, row) notation
@@ -83,4 +91,6 @@
    be as smooth as silk, and faster than you can think.
  
      
+###### References
+[1]: http://magpcss.org/ceforum/apidocs3/projects/%28default%29/_cef_key_event_t.html
      
