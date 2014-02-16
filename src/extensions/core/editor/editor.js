@@ -858,6 +858,9 @@
   Pane.prototype.switchBuffer = function(buffer, breakLink) {
     var _this = this;
 
+    // Safety check.
+    if (!buffer) return;
+
     // Break the link if requested.
     if (breakLink && this.linkedPane) this.linkToPane(false);
 
