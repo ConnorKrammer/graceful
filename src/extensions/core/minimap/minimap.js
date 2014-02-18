@@ -2,11 +2,16 @@
  * graceful-minimap
  *
  * Defines a command for the editor that displays a minimap for the current pane.
- * Depends on the graceful-editor core extension.
+ *
+ * Requires: graceful-editor
  */
 
 !function(global) {
   'use strict';
+
+/* =======================================================
+ *                        MiniMap
+ * ======================================================= */
 
   /**
    * MiniMap constructor.
@@ -337,6 +342,10 @@
     element.style.transition = transition;
     element.addEventListener('transitionend', transitionEnd);
   }
+
+/* =======================================================
+ *                       Commands
+ * ======================================================= */
 
   /**
    * When graceful is loaded, define the 'mini' command to

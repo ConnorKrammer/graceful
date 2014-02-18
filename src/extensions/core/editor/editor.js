@@ -1,8 +1,10 @@
 /**
  * graceful-editor
  *
- * Defines the Editor class, as well as several namespaced classes (Editor.Buffer, Editor.Pane,
- * Editor.InputPane, etc.) that relate to text editing functionality.
+ * Defines the Editor class, as well as several namespaced classes (Editor.Buffer,
+ * Editor.Pane, Editor.InputPane, etc.) that relate to text editing functionality.
+ *
+ * Requires: graceful-preferences
  */
 
 
@@ -2277,7 +2279,10 @@
     return this.element.textContent.replace(/\s+/g, '') !== '';
   };
 
-  // Expose globals.
+/* =======================================================
+ *                        Exports
+ * ======================================================= */
+
   global.Editor             = Editor;
   global.Editor.Buffer      = Buffer;
   global.Editor.Pane        = Pane;

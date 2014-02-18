@@ -3,18 +3,24 @@
  *
  * Defines the Preferences global object, responsible for managing
  * application preferences.
+ *
+ * Requires: graceful-filesystem
  */
 
 
 !function(global) {
   'use strict';
 
-  // Define the Preferences namespace.
-  function Preferences() {}
-
-  // Preference storage objects.
+  // Store preferences in local scope.
   var prefs;
   var userPrefs;
+
+/* =======================================================
+ *                      Preferences
+ * ======================================================= */
+
+  // Define the Preferences namespace.
+  function Preferences() {}
 
   /**
    * Loads saved preferences from file.
@@ -174,6 +180,9 @@
     }, object);
   }
 
-  // Expose globals.
+/* =======================================================
+ *                        Exports
+ * ======================================================= */
+
   global.Preferences = Preferences;
 }(this);

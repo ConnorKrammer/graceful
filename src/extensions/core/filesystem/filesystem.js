@@ -1,18 +1,19 @@
 /**
  * graceful-filesystem
  *
- * Adds the FileSystem object to the global namespace, responsible for all filesystem-related
- * methods and operations.
+ * Adds the FileSystem object to the global namespace, responsible for all
+ * filesystem-related methods and operations.
  *
- * For reading and writing files, only UTF-8 is supported.
- *
- * Note the use of the javascript promise library, Q, for asynchronous code.
- * See here (https://github.com/kriskowal/q) for more on understanding async promises.
+ * Requires: none
  */
 
 
 !function(global) {
   'use strict';
+
+/* =======================================================
+ *                       FileSystem
+ * ======================================================= */
 
   // Define the FileSystem namespace.
   function FileSystem() {}
@@ -414,7 +415,10 @@
     return deferred.promise;
   };
 
-  // Expose globals.
+/* =======================================================
+ *                        Exports
+ * ======================================================= */
+
   global.FileSystem = FileSystem;
 }(this);
 

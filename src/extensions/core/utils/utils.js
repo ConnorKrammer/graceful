@@ -5,11 +5,17 @@
  * functions that don't fit better in another core extension.
  *
  * @todo Refactor debugging utilities into their own extension.
+ *
+ * Requires: graceful-preferences
  */
 
 
 !function(global) {
   'use strict';
+
+/* =======================================================
+ *                         Utils
+ * ======================================================= */
 
   // Define the Utils namespace.
   function Utils() {}
@@ -116,6 +122,10 @@
     Utils.DEBUG_VERBOSE = Preferences.get('extensions.core.utils.debug.enabled');
     Utils.DEBUG_VERBOSE = Preferences.get('extensions.core.utils.debug.verbose');
   });
+
+/* =======================================================
+ *                        Exports
+ * ======================================================= */
 
   // Expose globals.
   global.Utils = Utils;
