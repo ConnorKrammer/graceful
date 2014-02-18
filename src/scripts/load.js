@@ -32,13 +32,15 @@
   graceful.coreLibraries = [
     'lodash/dist/lodash.min.js',
     'q/q.js',
-    'observable/lib/observable.js'
+    'observable/lib/observable.js',
+    'jquery/jquery.min.js'
   ];
 
   graceful.coreExtensions = [
     'utils',
     'filesystem',
     'preferences',
+    'dialog',
     'editor',
     'minimap'
   ];

@@ -1,0 +1,9 @@
+/**
+ * Extends the rules for vex's os theme.
+ */
+
+.vex.vex-theme-os .vex-content {
+  border-top-color: #333;
+  border-radius: 2px;
+  font-family: "Open Sans";
+}
