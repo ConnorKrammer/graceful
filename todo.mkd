@@ -9,14 +9,54 @@
 ###### Short-term:
  - Make pane animations more consistent when opening or closing new panes.
  
+ - Add `<hr />` elements back into the markdown subset used for highlighting 
+   documents, and use something like the following for its background:
+
+   ```
+   content: '-----------------------------------------------------------------------------------------------------------------------'; /* But use asterisks instead for those kinds of dividers. */
+   display: inline;
+   max-width: 100%;
+   position: absolute;
+   overflow: hidden;
+   left: 5px;
+   width: 100%;
+   white-space: nowrap;
+   opacity: 0.3;
+   ```
+ - Fix the line-wrapping used for preview panes (it shouldn't split words).
+ 
+ - Don't allow formatting within code blocks in markdown mode.
+ 
+ - In general, re-think what the markdown mode implements. Optionally allow 
+   the different items to be configured. (Only if it has a speed impact.)
+ 
+ - Convert tabs to spaces, and allow an option for showing visible 
+   whitespace.
+ 
+ - Don't auto-indent lines.
+ 
+ - Re-organize preferences.
+ 
 ###### CEF-related:
  - Expose more of the browser native functions to javascript.
+ 	- See [here] [1] for CEF documentation.
+    
  - Allow firing of native key events via javascript. This would allow form 
-   auto-fill, chainable key combinations, backspacing and moving through 
-   text all via javascript. Purpose: allow a much cleaner way of interacting 
-   with text than the currently horrible setRange/getRange nonsense that is 
-   required.
-   - See [here][1]
+   auto-fill, chainable key combinations, backspacing, and moving through 
+   text, all without interacting with the horrible setRange/getRange 
+   nonsense that is currently required. Does bring up some security 
+   concerns, however.
+ 	- See [here] [2] for the key event reference.
+    - Also see [here] [3] for the SendKeyEvent reference.
+    
+ - Make the browser cache location more portable.
+ 	- See [here] [4] for a pull request that makes progress on this item.
+    - See [here] [5] for the `cache_path` application setting.
+    
+ - Expose a custom context menu API through javascript.
+ 	- See [here] [6] for the ContextMenuHandler reference.
+    - See [this] [7] for how to get the menu handler from a CefClient 
+      instance.
  
 ###### Long-term:
  - Allow a way to get panes by physical order, not order added. Some 
@@ -59,13 +99,6 @@
  - Smooth scrolling.
  	- This will require looking into how Brackets does it (if they do at 
       all), and whether CEF allows that sort of thing to be configured.
-      
- - Faster input processing. Holding down keys (especially delete and 
-   backspace) lags the input fairly noticeably.
-   - A fork of CodeMirror that strips out non-webkit functionality might be 
-     in order, depending on whether or not performance would actually be 
-     improved. As of now, such an action would likely be more work than it's 
-     worth.
      
  - Implement user-configureable key commands.
  
@@ -88,9 +121,28 @@
  - Add in session management.
  
  - Overall, implement performance improvements. The whole damn thing should 
-   be as smooth as silk, and faster than you can think.
+   be as smooth as silk, and faster than you can think. This task will never 
+   really be finished.
  
+ - Switch from the Q promise library over to the [Bluebird] [8] promise 
+   library. It has better performance and debugging capabilities.
+   
+ - Use RequireJS for loading modules instead of yepnope. (The project has 
+   outgrown it to an extent.)
      
 ###### References
-[1]: http://magpcss.org/ceforum/apidocs3/projects/%28default%29/_cef_key_event_t.html
-     
+[1]: http://magpcss.org/ceforum/apidocs3/ "CEF C++ documentation"
+
+[2]: http://magpcss.org/ceforum/apidocs3/projects/%28default%29/_cef_key_event_t.html
+
+[3]: http://magpcss.org/ceforum/apidocs3/projects/%28default%29/CefBrowserHost.html#SendKeyEvent "SendKeyEvent - Reference"
+
+[4]: https://github.com/adobe/brackets-shell/pull/333 "Brackets pull request"
+
+[5]: http://magpcss.org/ceforum/apidocs3/projects/%28default%29/_cef_settings_t.html#cache_path "Cache path application setting - Reference"
+
+[6]: http://magpcss.org/ceforum/apidocs3/projects/%28default%29/CefContextMenuHandler.html "ContextMenuHandler - Reference"
+
+[7]: http://magpcss.org/ceforum/apidocs3/projects/%28default%29/CefClient.html#GetContextMenuHandler%28%29 "GetContextMenuHandler - Reference"
+
+[8]: https://github.com/petkaantonov/bluebird "Bluebird - GitHub repository"
