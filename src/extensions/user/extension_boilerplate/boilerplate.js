@@ -1,8 +1,18 @@
 /**
- * extension name
+ * <name>
+ *   extension-boilerplate
  *
- * Add your description here, list any dependencies (nice, but not
- * required), and maybe link to your GitHub repo.
+ * <description> 
+ *   An extension starting point for developers.
+ *
+ * <required extensions>
+ *   Requires: none
+ *
+ * @todo Consider asking developers to include an extension metadata file
+ *       holding the above, as well as compatibility information (kind of
+ *       like a bower.json file). This opens up interesting possibilities
+ *       for automatic dependency downloads for a package manager, or
+ *       alerting developers when their extensions break.
  *
  * Note that you have access to all core extensions, as well as the
  * fully initialized graceful object. For more information, you might
