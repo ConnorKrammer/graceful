@@ -1,0 +1,18 @@
+# Extension Boilerplate
+
+This is a jumpstarter for developing an extension to the Graceful editor. The basic file structure is layed out and ready for use -- just open it up, empty out the example file, and get started!
+
+User extensions have access to all core extensions (core extensions being those that come bundled with graceful, found in the `extensions/core/` directory), as well as the globally defined `graceful` object.
+
+The default layout is as follows:
+
+```
+extension/
+|-- vendor/
+|    +-- (any vendor files)
+|-- boilerplate.js
+|-- boilerplate.css
++-- load.js
+```
+
+This layout is entirely arbitrary except for `load.js`, which **must** be in the extension's uppermost directory.
