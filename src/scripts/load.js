@@ -64,7 +64,17 @@
           return loadAsync(graceful.mainFile);
         })
         .then(function() {
-          graceful.userExtensions = Preferences.get('extensions.userExtensions') || '';
+          graceful.userExtensions = _(Preferences.get('extensions'))
+            .map(function(extension, key) {
+              if (graceful.coreExtensions.indexOf(key) !== -1) return false;
+              else if (extension.enabled !== true) return false;
+              else return key;
+            })
+            .compact()
+            .value();
+
+          graceful.userExtensions = graceful.userExtensions || '';
+
           user = buildFilepath(graceful.userExtensions, graceful.userExtensionDirectory, '/load.js');
           return loadAsync(user);
         })

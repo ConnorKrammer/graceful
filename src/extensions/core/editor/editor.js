@@ -14,36 +14,6 @@
   // Counter for buffer IDs.
   var currentBufferID = 0;
 
-  var inputModeKey = 'inputmode';
-  var previewModeKey = 'previewmode';
-
-  /**
-   * Initial test of the Preferences extension.
-   */
-  Preferences.default(['filetypes.mkd.inputmode', 'filetypes.default.inputmode'], { name: 'markdown-lite' });
-  Preferences.default(['filetypes.mkd.previewmode', 'filetypes.default.previewmode'], parseMarkdown);
-
-  /**
-   * Parses markdown into HTML.
-   *
-   * @todo Get rid of this and implement parsing using
-   *       Pandoc (http://johnmacfarlane.net/pandoc/). Doing
-   *       so will require writing a C++ binding to run scripts
-   *       on the command line.
-   */
-  function parseMarkdown(input) {
-    return marked(input, {
-      gfm: true,
-      tables: true,
-      breaks: true,
-      pedantic: false,
-      sanitize: false,
-      smartLists: true,
-      smartypants: false,
-      langPrefix: 'lang-'
-    });
-  }
-
 /* =======================================================
  *                         Buffer
  * ======================================================= */
@@ -82,7 +52,7 @@
     this.text = text = text || '';
 
     // Get the mode default.
-    mode = mode || detectMode(this.filepath, inputModeKey);
+    mode = mode || detectMode(this.filepath, prefKeys.subKeys.inputMode);
 
     // The master document.
     this.rootDoc = CodeMirror.Doc(text, mode);
@@ -170,15 +140,15 @@
    function detectMode(filepath, key) {
     var index, filetype;
 
-    if (filepath) {
+    if (filepath && filepath.indexOf('.') !== -1) {
       index    = filepath.lastIndexOf('.');
       filetype = filepath.substr(index + 1);
     } else {
       filetype = 'default';
     }
 
-    return Preferences.get('filetypes.' + filetype + '.' + key) ||
-      Preferences.get('filetypes.default.' + key);
+    return Preferences.get(prefKeys.filetypes + '.' + filetype + '.' + key) ||
+      Preferences.get(prefKeys.filetypes + '.default.' + key);
   };
 
   /**
@@ -1108,11 +1078,11 @@
     
     // Listen for filepath changes on the new buffer.
     this.filetypeChangeID = buffer.on('changeFilepath', function(filepath, title) {
-      _this.setMode(detectMode(filepath, inputModeKey));
+      _this.setMode(detectMode(filepath, prefKeys.subKeys.inputMode));
     });
 
     // Detect and set a mode.
-    this.setMode(detectMode(buffer.filepath, inputModeKey));
+    this.setMode(detectMode(buffer.filepath, prefKeys.subKeys.inputMode));
     
     return Pane.prototype.switchBuffer.call(this, buffer, breakLink);
   };
@@ -1120,6 +1090,38 @@
 /* =======================================================
  *                      PreviewPane
  * ======================================================= */
+
+  // For storing parsing modes.
+  PreviewPane.modes = {};
+
+  /**
+   * Registers a new parsing mode. The parsing function must take
+   * a string as input and returns valid HTML as output.
+   *
+   * This is a class method, not an instance method.
+   *
+   * @param {String} name - The name of the mode.
+   * @param {Function} func - The parsing func.
+   * @return {Boolean} False if the mode name is already defined, else true.
+   */
+  PreviewPane.registerMode = function(name, func) {
+    // Safety check.
+    if (typeof this.modes[name] !== 'undefined') return false;
+
+    // Set the mode.
+    this.modes[name] = func;
+    return true;
+  };
+
+  /**
+   * Returns the function associated with a mode.
+   *
+   * @param {String} name - The name of the mode.
+   * @return {Function|False} The parsing function, or false if the mode is not defined.
+   */
+  PreviewPane.getMode = function(name) {
+    return (typeof this.modes[name] !== 'undefined') ? this.modes[name] : false;
+  }
 
   // Inherit from Pane.
   PreviewPane.prototype = Object.create(Pane.prototype);
@@ -1138,7 +1140,7 @@
    */
   function PreviewPane(editor, buffer, wrapper, parse) {
     // The preview function.
-    this.parse = parse || detectMode(buffer.filepath, previewModeKey);
+    this.parse = parse || PreviewPane.getMode(detectMode(buffer.filepath, prefKeys.subKeys.previewMode));
 
     // Add a preview area to the wrapper.
     this.previewArea = document.createElement('div');
@@ -1167,11 +1169,11 @@
     
     // Listen for filepath changes on the new buffer.
     this.filetypeChangeID = buffer.on('changeFilepath', function(filepath, title) {
-      _this.parse = detectMode(filepath, previewModeKey);
+      _this.parse = PreviewPane.getMode(detectMode(filepath, prefKeys.subKeys.previewMode));
     });
 
     // Detect and set a mode.
-    this.parse = detectMode(buffer.filepath, previewModeKey);
+    this.parse = PreviewPane.getMode(detectMode(buffer.filepath, prefKeys.subKeys.previewMode));
 
     if (typeof this.changeID !== 'undefined') {
       this.buffer.off(this.changeID);
@@ -1276,7 +1278,7 @@
   Editor.prototype.init = function() {
     // Add the test panes.
     var input = this.addPane(InputPane, null, 'horizontal');
-    //var preview = this.addPane(PreviewPane, null, 'horizontal');
+    var preview = this.addPane(PreviewPane, null, 'horizontal');
   };
 
   /**
@@ -2278,6 +2280,47 @@
   CommandBar.prototype.hasText = function() {
     return this.element.textContent.replace(/\s+/g, '') !== '';
   };
+
+/* =======================================================
+ *                       Preferences
+ * ======================================================= */
+
+  // Preference keys.
+  var prefKeys = {
+    root:     'extensions.editor',
+    filetypes: 'extensions.editor.filetypes',
+    subKeys: {
+      inputMode:   'inputmode',
+      previewMode: 'previewmode'
+    }
+  };
+
+  // Set defaults.
+  Preferences.default([prefKeys.filetypes + '.mkd', prefKeys.filetypes + '.default'], {
+    inputmode: 'markdown-lite',
+    previewmode: 'markdown'
+  });
+
+  /**
+   * Defines a mode that parses markdown into HTML.
+   *
+   * @todo Get rid of this and implement parsing using
+   *       Pandoc (http://johnmacfarlane.net/pandoc/). Doing
+   *       so will require writing a C++ binding to run scripts
+   *       on the command line.
+   */
+  PreviewPane.registerMode('markdown', function(input) {
+    return marked(input, {
+      gfm: true,
+      tables: true,
+      breaks: true,
+      pedantic: false,
+      sanitize: false,
+      smartLists: true,
+      smartypants: false,
+      langPrefix: 'lang-'
+    });
+  });
 
 /* =======================================================
  *                        Exports

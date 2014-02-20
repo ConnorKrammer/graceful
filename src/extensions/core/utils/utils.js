@@ -110,17 +110,28 @@
     }
   };
 
-  /**
-   * Set default preferences and load in preferences.
-   */
+/* =======================================================
+ *                       Preferences
+ * ======================================================= */
+
   graceful.onLoad(function() {
-    Preferences.default('extensions.core.utils.debug', {
+    // Preference keys.
+    var prefKeys = {
+      root:         'extensions.utils',
+      debug:        'extensions.utils.debug',
+      debugEnabled: 'extensions.utils.debug.enabled',
+      debugVerbose: 'extensions.utils.debug.verbose'
+    };
+
+    // Set defaults.
+    Preferences.default(prefKeys.debug, {
       enabled: true,
       verbose: false
     });
 
-    Utils.DEBUG_VERBOSE = Preferences.get('extensions.core.utils.debug.enabled');
-    Utils.DEBUG_VERBOSE = Preferences.get('extensions.core.utils.debug.verbose');
+    // Load values.
+    Utils.DEBUG_ENABLED = Preferences.get(prefKeys.debugEnabled);
+    Utils.DEBUG_VERBOSE = Preferences.get(prefKeys.debugVerbose);
   });
 
 /* =======================================================

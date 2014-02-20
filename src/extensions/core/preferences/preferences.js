@@ -60,11 +60,10 @@
    * Conditions:
    * Key..............Preference set using key.
    * Key and subkey...Preference set using subkey.
-   * Neither..........Does nothing.
    *
    * Example of key: "User.Editor.FontSize"
    *
-   * @param {String|String[]} [key] - The main preference key, with
+   * @param {String|String[]} key - The main preference key, with
    *        subkeys denoted using '.' object notation. If an array is
    *        passed, the same value will be set on all keys.
    * @param {*} data - The data to set.
@@ -141,7 +140,7 @@
    *
    * See Preferences.set() for a description of valid keys.
    *
-   * @param {String|String[]} [key] - The main preference key, with
+   * @param {String|String[]} key - The main preference key, with
    *        subkeys denoted using '.' object notation. If an array is
    *        passed, the same value will be set on all keys.
    * @param {*} data - The data to set.
