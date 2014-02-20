@@ -354,7 +354,7 @@
     // Create the status light.
     this.linkLight = document.createElement('div');
     this.linkLight.className = 'status-light';
-    this.linkLight.addEventListener('click', this.startLinkClickHandler);
+    this.linkLight.addEventListener('mouseup', this.startLinkClickHandler);
 
     // Add elements to the DOM.
     pane.infoBar.appendChild(this.linkBar);
@@ -382,11 +382,11 @@
     // Add the link line and add event listeners.
     this.pane.editor.linkLineContainer.appendChild(this.linkLine);
     document.addEventListener('mousemove', this.drawLinkLineMoveHandler);
-    document.addEventListener('click', this.endLinkClickHandler);
+    document.addEventListener('mouseup', this.endLinkClickHandler);
     document.addEventListener('keydown', this.endLinkKeyHandler);
 
     // Remove the start listener.
-    this.linkLight.removeEventListener('click', this.startLinkClickHandler);
+    this.linkLight.removeEventListener('mouseup', this.startLinkClickHandler);
   };
 
   /**
@@ -405,11 +405,11 @@
 
     // Remove event listeners.
     document.removeEventListener('mousemove', this.drawLinkLineMoveHandler);
-    document.removeEventListener('click', this.endLinkClickHandler);
+    document.removeEventListener('mouseup', this.endLinkClickHandler);
     document.removeEventListener('keydown', this.endLinkKeyHandler);
 
     // Add the start listener again.
-    this.linkLight.addEventListener('click', this.startLinkClickHandler);
+    this.linkLight.addEventListener('mouseup', this.startLinkClickHandler);
 
     // Look for a pane under the cursor and link to it.
     if (makeLink) {
