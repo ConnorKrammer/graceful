@@ -223,6 +223,9 @@ pip-log.txt
 src/preferences.json
 src/user.preferences.json
 
+# Ignore todo.mkd files
+todo.mkd
+
 # Explicitly include anything within extensions/ or vendor/
 !src/extensions/**/*
 !src/vendor/**/*
