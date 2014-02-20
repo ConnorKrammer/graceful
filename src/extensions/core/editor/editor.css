@@ -211,8 +211,7 @@ body {
 
 .preview-area {
   height: 100%;
-  white-space: pre;
-  word-wrap: break-word;
+  white-space: pre-wrap;
   overflow-y: auto;
 }
 
