@@ -43,8 +43,6 @@
 
   Extension.log = function() {
     console.log("I'm an extension!");
-    console.log("I am dependent on: " + dependency);
-    console.log("This is now undefined: " + global.dependency);
   };
 
 /* =======================================================
@@ -62,9 +60,34 @@
 
   Extension_2.prototype.log = function() {
     console.log("I'm an extension instance!");
-    console.log("I am dependent on: " + dependency);
-    console.log("This is now undefined: " + global.dependency);
   };
+
+/* =======================================================
+ *                       Preferences
+ *
+ * Now you can set any preferences that you like, assuming
+ * that you need to set any at all. It's recommended that
+ * if you do, you keep an object that tracks the key names
+ * you use so that they are easy to reuse across your
+ * extension.
+ * ======================================================= */
+
+  // Preference keys.
+  var prefKeys = {
+    root:        'extensions.extension_boilerplate',
+    examplePref: 'extensions.extension_boilerplate.examplePref',
+    anotherPref: 'extensions.extension_boilerplate.anotherPref'
+  };
+
+  /**
+   * We're not actually going to set anything, but here's what it'd look like:
+   *
+   *     // Set defaults.
+   *     Preferences.default(prefKeys.examplePref, 'test value');
+   *     Preferences.default(prefKeys.anotherPref, 'another value');
+   *
+   * Of course, your preferences should be more useful than that.
+   */
 
 /* =======================================================
  *                        Exports
