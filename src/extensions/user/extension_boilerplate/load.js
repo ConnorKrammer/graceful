@@ -8,7 +8,6 @@
  * listed. After all files have finished loading the passed callback will fire.
  */
 graceful.loader.loadExtension([
-  'user/extension_boilerplate/vendor/dependency.js',
   'user/extension_boilerplate/boilerplate.js',
   'user/extension_boilerplate/boilerplate.css'
 ]);
