@@ -1414,7 +1414,7 @@
   };
 
   /**
-   * Remove the specified pane.
+   * Removes the specified pane.
    *
    * @param {Pane} pane - The pane to remove.
    * @param {Function} callback - A callback to run after removing the pane.
@@ -1759,12 +1759,12 @@
    * @param {Object}   config                   - A configuration object.
    * @param {String}   config.name              - The name of the command.
    * @param {Function} config.func              - The function the command invokes.
+   * @param {Function} [config.focusFunc]       - A function taking an editor instance and returning a new pane
+   *                                              to pass focus to after executing the command.
    * @param {Integer}  [config.argCount=0]      - The number of arguments the command function accepts.
    * @param {String}   [config.delimeter=' ']   - The delimeter between function arguments.
    * @param {Boolean}  [config.forceLast=false] - Whether the command should be pushed to the end
    *                                              of the call list when several commands are run sequentially.
-   * @param {Function} [config.focusFunc]       - A function taking an editor instance and returning a new pane
-   *                                              to pass focus to after executing the command.
    *
    * @return {Boolean} Returns false if the command definition is invalid, otherwise true.
    */
