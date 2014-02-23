@@ -624,7 +624,7 @@
    *        their links updated as well.
    */
   function updateDisplayedLinks(pane) {
-    var show = pane.editor.container.classList.contains('showing-links');
+    var show = pane.editor.container.classList.contains('showing-links') || pane.statusLight.isShowingLink;
 
     // Update pane.
     if (show) pane.statusLight.showLink(false);
