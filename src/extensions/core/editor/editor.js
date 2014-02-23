@@ -1315,6 +1315,7 @@
    * @param {Pane} [parentPane] - A pane to add the new pane relative to.
    * @param {Boolean} [isInstant=false] - Whether or not the addition should be
    *        instant (have no transition).
+   * @return {Pane} The newly added pane.
    */
   Editor.prototype.addPane = function(constructor, args, type, parentPane, isInstant) {
     var container = this.container;
