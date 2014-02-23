@@ -894,7 +894,7 @@
     }
 
     if (pane) {
-      // This pane shouldn't be cycle-able.
+      // Anchor the pane.
       this.isAnchored = true;
 
       // Switch to the new buffer.
