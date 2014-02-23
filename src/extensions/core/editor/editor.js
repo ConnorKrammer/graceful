@@ -1288,13 +1288,15 @@
    */
   Editor.prototype.init = function() {
     // Add the test panes.
-    var input = this.addPane(InputPane, null, 'horizontal');
-    var preview = this.addPane(PreviewPane, null, 'horizontal');
+    var input = this.addPane(InputPane, null, 'horizontal', null, true);
+    var preview = this.addPane(PreviewPane, null, 'horizontal', null, true);
   };
 
   /**
    * Adds a new pane. If the type is set to 'vertical', then the pane will be
-   * inserted into the same vertical compartment as parentPane.
+   * inserted into the same vertical compartment as parentPane. If parentPane
+   * is specified, then the new pane will be immediately adjacent to it, or
+   * will otherwise be appended to the editor container.
    *
    * Note that the editor parameter can be omitted from the arguments to pass to
    * the pane constructor, or can be stated explictly.
@@ -1310,8 +1312,11 @@
    * @param {String} type - The orientation of the pane. Passing 'vertical' will
    *        create the split vertically, while 'horizontal' splits it in the horizontal
    *        direction.
+   * @param {Pane} [parentPane] - A pane to add the new pane relative to.
+   * @param {Boolean} [isInstant=false] - Whether or not the addition should be
+   *        instant (have no transition).
    */
-  Editor.prototype.addPane = function(constructor, args, type, parentPane) {
+  Editor.prototype.addPane = function(constructor, args, type, parentPane, isInstant) {
     var container = this.container;
     var pane, factoryFunction, wrapper, focusPane, outerWrapper;
 
@@ -1359,7 +1364,7 @@
     }
 
     // Add the wrapper to the DOM.
-    if (typeof parentPane !== 'undefined') {
+    if (parentPane) {
       outerWrapper = type === 'horizontal'
         ? parentPane.getOuterWrapper()
         : parentPane.wrapper;
@@ -1383,12 +1388,14 @@
     this.panes.push(pane);
 
     // Transition in the pane. 
-    wrapper.classList.add('opening');
-    wrapper.offsetHeight; // Trigger reflow.
-    wrapper.classList.remove('opening');
+    if (!isInstant) {
+      wrapper.classList.add('opening');
+      wrapper.offsetHeight; // Trigger reflow.
+      wrapper.classList.remove('opening');
+    }
 
     // Size the panes appropriately.
-    sizePanesEvenly(this, container, type);
+    sizePanesEvenly(this, container, type, isInstant);
 
     // Vertical splits cause display issues.
     if (type === 'vertical') {
@@ -1456,7 +1463,7 @@
     splitter.classList.add('closing');
 
     // Remove the pane and resize the remaining panes.
-    sizePanesEvenly(this, parentElement, direction, wrapper, function() {
+    sizePanesEvenly(this, parentElement, direction, false, wrapper, function() {
       parentElement.removeChild(splitter);
       parentElement.removeChild(wrapper);
       callback();
@@ -1957,10 +1964,11 @@
    * @param {Editor} editor - The editor to resize panes from.
    * @param {Element} container - The element containing the panes.
    * @param {String} direction - The direction to resize the panes in.
-   * @param {Element|Element[]} exclusions - Any pane wrappers to exclude.
-   * @param {Function} callback - A callback to run after resizing the panes.
+   * @param {Boolean} [isInstant=false] - Whether to apply the resize without a transition. 
+   * @param {Element|Element[]} [exclusions] - Any pane wrappers to exclude.
+   * @param {Function} [callback] - A callback to run after resizing the panes.
    */
-  function sizePanesEvenly(editor, container, direction, exclusions, callback) {
+  function sizePanesEvenly(editor, container, direction, isInstant, exclusions, callback) {
     var children      = container.children;
     var paneCount     = (children.length + 1) / 2;
     var property      = (direction === 'horizontal') ? 'width' : 'height';
@@ -1979,9 +1987,16 @@
       // Skip ahead if child is excluded.
       if (exclusions.indexOf(child) !== -1) continue;
 
+      // Disable transition.
+      if (isInstant) child.classList.add('disable-transition');
+
       // Set the new size.
       child.style[property] = size + '%';
       child.style[otherProperty] = '';
+      child.offsetHeight; // Trigger reflow.
+
+      // Re-enable transitions.
+      if (isInstant) child.classList.remove('disable-transition');
     }
 
     // Triggers a resize on all affected panes.
@@ -1989,6 +2004,12 @@
       _.forEach(editor.panes, function(pane) {
         pane.trigger('resize');
       });
+    }
+
+    if (isInstant) {
+      triggerResize();
+      if (typeof callback === 'function') callback();
+      return;
     }
 
     // Trigger resize events on an interval.
