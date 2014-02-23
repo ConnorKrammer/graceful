@@ -357,7 +357,7 @@
     this.linkLight.addEventListener('mouseup', this.startLinkClickHandler);
 
     // Add elements to the DOM.
-    pane.infoBar.appendChild(this.linkBar);
+    pane.titleBar.appendChild(this.linkBar);
     this.linkBar.appendChild(this.linkButton);
     this.linkBar.appendChild(this.linkLight);
 
@@ -684,25 +684,25 @@
     this.wrapper.className = 'pane ' + type;
     this.wrapper.setAttribute('tabIndex', 0);
 
-    // Create the info bar.
-    this.infoBar = document.createElement('div');
-    this.infoBar.className = 'infobar';
+    // Create the title bar.
+    this.titleBar = document.createElement('div');
+    this.titleBar.className = 'title-bar';
 
-    // Add a title to the info bar.
+    // Add a title to the title bar.
     this.titleElement = document.createElement('span');
     this.titleElement.className = 'title';
-    this.infoBar.appendChild(this.titleElement);
+    this.titleBar.appendChild(this.titleElement);
 
-    // Add a status light to the info bar.
+    // Add a status light to the title bar.
     this.statusLight = new StatusLight(this);
 
     // Add the anchor icon.
     var anchor = document.createElement('div');
     anchor.className = 'anchor';
-    this.infoBar.appendChild(anchor);
+    this.titleBar.appendChild(anchor);
 
-    // Add the info bar to the wrapper.
-    this.wrapper.appendChild(this.infoBar);
+    // Add the title bar to the wrapper.
+    this.wrapper.appendChild(this.titleBar);
 
     // Add the command bar.
     this.commandBar = new CommandBar(this);

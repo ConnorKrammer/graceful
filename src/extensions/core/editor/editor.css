@@ -1,5 +1,3 @@
-/* TODO: Rename .infobar to .title-bar. */
-
 /* =======================================================
  *                        General
  * ======================================================= */
@@ -222,14 +220,14 @@ body {
 }
 
 /* =======================================================
- *                        Info Bar
+ *                        Title Bar
  *
- * An info bar sits at the top of each pane, and gives the
- * title of the pane's buffer. It also houses the link
- * bar.
+ * The title bar sits at the top of each pane, and both
+ * displays the title of the pane's buffer and houses the
+ * link bar.
  * ======================================================= */
 
-.infobar {
+.title-bar {
   position: absolute;
   top: -24px;
   height: 24px;
@@ -239,7 +237,7 @@ body {
   z-index: 1;
 }
 
-.infobar .title {
+.title-bar .title {
   position: absolute;
   width: 100%;
   font-size: 17px;
@@ -338,7 +336,7 @@ body {
               border-bottom-width 300ms ease-in;
 }
 
-.infobar {
+.title-bar {
   transition: top 300ms ease-in;
 }
 
@@ -361,7 +359,7 @@ body {
   border-bottom-width: 0;
 }
 
-.vertical-splitter-pane > .pane.closing > .infobar {
+.vertical-splitter-pane > .pane.closing > .title-bar {
   top: 0;
 }
 
@@ -395,7 +393,7 @@ body {
   border-bottom-width: 0;
 }
 
-.vertical-splitter-pane > .pane.opening > .infobar {
+.vertical-splitter-pane > .pane.opening > .title-bar {
   transition: none;
   top: 0;
 }
