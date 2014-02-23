@@ -83,10 +83,10 @@
     if (link) newPane.linkToPane(pane);
 
     // Allow the transition to finish before subsequent commands can start.
-    newPane.wrapper.addEventListener('transitionend', function endListener(event) {
+    newPane.wrapper.addEventListener('transitionend', function listener(event) {
       if (event.propertyName === property) {
         deferred.resolve();
-        pane.wrapper.removeEventListener('transitionend', endListener);
+        pane.wrapper.removeEventListener('transitionend', listener);
       }
     });
 
@@ -161,8 +161,13 @@
     name: 'close',
     argCount: 1,
     func: function(pane, paneNumber) {
+      var deferred = Q.defer();
+
+      // Remove the pane.
       pane = paneNumber ? graceful.editor.panes[parseInt(paneNumber, 10)] : pane;
-      graceful.editor.removePane(pane);
+      graceful.editor.removePane(pane, function() { deferred.resolve(); });
+
+      return deferred.promise;
     },
     focusFunc: function(editor) {
       return editor.getFocusPane(); 

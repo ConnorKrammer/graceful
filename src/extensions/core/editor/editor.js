@@ -979,6 +979,17 @@
     this.linkingPanes.splice(this.linkingPanes.indexOf(this), 1);
   };
 
+  /**
+   * Returns the element housing the pane's contents that
+   * is an immediate child of the editor container. 
+   *
+   * @return {Element} The outermost wrapping element.
+   */
+  Pane.prototype.getOuterWrapper = function() {
+    var parentElement = this.wrapper.parentElement;
+    return parentElement.classList.contains('vertical-splitter-pane') ? parentElement : this.wrapper;
+  };
+
 /* =======================================================
  *                       InputPane
  * ======================================================= */
@@ -1288,7 +1299,6 @@
    * Note that the editor parameter can be omitted from the arguments to pass to
    * the pane constructor, or can be stated explictly.
    *
-   * @todo Add the new pane immediately after the parent pane.
    * @todo Contemplate whether or not to emulate vim's behaviour, in that a pane
    *       taking up approximately > 80% of the screen's width/height will be
    *       partitioned in half without effecting any other panes.
@@ -1303,7 +1313,7 @@
    */
   Editor.prototype.addPane = function(constructor, args, type, parentPane) {
     var container = this.container;
-    var pane, factoryFunction, wrapper, focusPane;
+    var pane, factoryFunction, wrapper, focusPane, outerWrapper;
 
     // Default args to an array.
     args = [].concat(args);
@@ -1349,8 +1359,18 @@
     }
 
     // Add the wrapper to the DOM.
-    if (this.panes.length) this.addSplitter(container, type);
-    container.appendChild(wrapper);
+    if (typeof parentPane !== 'undefined') {
+      outerWrapper = type === 'horizontal'
+        ? parentPane.getOuterWrapper()
+        : parentPane.wrapper;
+
+      container.insertBefore(wrapper, outerWrapper.nextElementSibling);
+    } else {
+      container.appendChild(wrapper);
+    }
+
+    // Add the splitter to the DOM (unless we're adding the first pane).
+    if (this.panes.length) this.addSplitter(container, wrapper, type);
     
     // Add the constructor as the first argument to the factory function.
     args.unshift(constructor);
@@ -1361,6 +1381,13 @@
 
     // Add the pane to the pane list.
     this.panes.push(pane);
+
+    // Transition in the pane. 
+    wrapper.classList.add('opening');
+    wrapper.offsetHeight; // Trigger reflow.
+    wrapper.classList.remove('opening');
+
+    // Size the panes appropriately.
     sizePanesEvenly(this, container, type);
 
     // Vertical splits cause display issues.
@@ -1382,14 +1409,15 @@
    * Remove the specified pane.
    *
    * @param {Pane} pane - The pane to remove.
+   * @param {Function} callback - A callback to run after removing the pane.
    */
-  Editor.prototype.removePane = function(pane) {
+  Editor.prototype.removePane = function(pane, callback) {
     var container        = pane.wrapper.parentElement;
     var sibling          = pane.wrapper.previousElementSibling || pane.wrapper.nextElementSibling;
     var containerParent  = container.parentElement;
     var containerSibling = container.previousElementSibling || container.nextElementSibling;
     var shouldRefocus    = this.hasFocusedPane() ? pane === this.getFocusPane() : false;
-    var newFocus;
+    var wrapper, splitter, parentElement, direction, newFocus;
 
     // Separate cases are needed for cases including vertical splitters.
     // For example, removing the last pane in a vertical split should also remove the split.
@@ -1398,38 +1426,41 @@
       && container.classList.contains('vertical-splitter-pane')
       && containerSibling.classList.contains('splitter');
 
-    if (shouldRemovePane) {
-      // Remove the pane.
-      container.removeChild(pane.wrapper);
-      container.removeChild(sibling);
-      this.panes.splice(this.panes.indexOf(pane), 1);
-
-      // Unlink all linking panes.
-      if (pane.linkingPanes) pane.unlinkAllPanes();
-
-      // Resize the remaining panes.
-      if (sibling.classList.contains('splitter-horizontal')) {
-        sizePanesEvenly(this, container, 'horizontal');
-      } else {
-        sizePanesEvenly(this, container, 'vertical');
-      }
-    }
-    else if (shouldRemoveParent) {
-      // Remove the vertical split housing the pane.
-      containerParent.removeChild(container);
-      containerParent.removeChild(containerSibling);
-      this.panes.splice(this.panes.indexOf(pane), 1);
-
-      // Unlink all linking panes.
-      if (pane.linkingPanes) pane.unlinkAllPanes();
-
-      // Resize the remaining panes.
-      sizePanesEvenly(this, containerParent, 'horizontal');
-    }
-    else {
-      // It's the last pane, so just give it a new buffer.
+    // It's the last pane, so just give it a new buffer.
+    if (!shouldRemovePane && !shouldRemoveParent) {
       pane.switchBuffer(new Buffer());
+      callback();
+      return false;
     }
+
+    // Operate on the correct elements.
+    if (shouldRemovePane) {
+      parentElement = container;
+      wrapper       = pane.wrapper;
+      splitter      = sibling;
+    } else {
+      parentElement = containerParent;
+      wrapper       = container;
+      splitter      = containerSibling;
+    }
+
+    // Get the proper resize direction.
+    direction = splitter.classList.contains('splitter-horizontal') ? 'horizontal' : 'vertical';
+
+    // Clean up pane references.
+    this.panes.splice(this.panes.indexOf(pane), 1);
+    if (pane.linkingPanes) pane.unlinkAllPanes();
+
+    // Transition out the panes.
+    wrapper.classList.add('closing');
+    splitter.classList.add('closing');
+
+    // Remove the pane and resize the remaining panes.
+    sizePanesEvenly(this, parentElement, direction, wrapper, function() {
+      parentElement.removeChild(splitter);
+      parentElement.removeChild(wrapper);
+      callback();
+    });
 
     // Focus another pane.
     if (shouldRefocus) {
@@ -1446,8 +1477,6 @@
    *       200 lines of code long, and the separate drag handlers
    *       could probably be combined (each being 50 lines by
    *       themselves).
-   * @todo Add an argument specifying after which child the splitter
-   *       should be added.
    * @todo Factor out the drag detection into a utility class so that
    *       it can be used elsewhere without code duplication.
    * @todo Move the constant terms used to calculate the minimum width
@@ -1455,16 +1484,17 @@
    *       it is also used to calculate the maximum number of panes).
    *
    * @param {Element} container - The element to insert the splitter into.
+   * @param {Element} child - The element after which the splitter should be inserted.
    * @param {String} type - The direction the splitter should move in.
    */
-  Editor.prototype.addSplitter = function(container, type) {
+  Editor.prototype.addSplitter = function(container, child, type) {
     var splitter = document.createElement('div');
     var isDrag   = false;
     var _this    = this;
     var lastX, lastY, deltaX, deltaY, dragHandler, resizePanes, prev, next;
 
     splitter.className = 'splitter splitter-' + type;
-    container.appendChild(splitter);
+    container.insertBefore(splitter, child);
 
     if (type === 'horizontal') {
       dragHandler = function(event) {
@@ -1925,39 +1955,55 @@
   /**
    * Divides up the space evenly among panes in the given direction.
    *
+   * A pane's size is assumed to be zero if it is listed in 'exclusions'.
+   *
    * @param {Editor} editor - The editor to resize panes from.
    * @param {Element} container - The element containing the panes.
    * @param {String} direction - The direction to resize the panes in.
+   * @param {Element|Element[]} exclusions - Any pane wrappers to exclude.
+   * @param {Function} callback - A callback to run after resizing the panes.
    */
-  function sizePanesEvenly(editor, container, direction) {
-    var children = container.children;
-    var paneCount = (children.length + 1) / 2;
-    var child;
+  function sizePanesEvenly(editor, container, direction, exclusions, callback) {
+    var children      = container.children;
+    var paneCount     = (children.length + 1) / 2;
+    var property      = (direction === 'horizontal') ? 'width' : 'height';
+    var otherProperty = (direction === 'horizontal') ? 'height' : 'width';
+    var child, size, interval;
+
+    // Don't count exclusions.
+    exclusions = [].concat(exclusions || []);
+    paneCount -= exclusions.length;
+    size = 1 / paneCount * 100;
 
     // Iterate by 2's to avoid splitters.
     for (var i = 0; i < children.length; i += 2) {
       child = children[i];
-      if (direction === 'horizontal') {
-        child.style.width = (1 / paneCount * 100) + '%';
-        child.style.height = '';
-      } else {
-        child.style.height = (1 / paneCount * 100) + '%';
-        child.style.width = '';
-      }
+
+      // Skip ahead if child is excluded.
+      if (exclusions.indexOf(child) !== -1) continue;
+
+      // Set the new size.
+      child.style[property] = size + '%';
+      child.style[otherProperty] = '';
     }
 
-    // Trigger a resize event.
-    _.forEach(editor.panes, function(pane) {
-      pane.trigger('resize');
-    });
+    // Triggers a resize on all affected panes.
+    function triggerResize() {
+      _.forEach(editor.panes, function(pane) {
+        pane.trigger('resize');
+      });
+    }
+
+    // Trigger resize events on an interval.
+    interval = setInterval(triggerResize, 10);
 
     // Just use the last child, since the timing is the same for all of them.
-    child.addEventListener('transitionend', function(event) {
-      var property = (direction === 'horizontal') ? 'width' : 'height';
+    child.addEventListener('transitionend', function listen(event) {
       if (event.propertyName === property) {
-        _.forEach(editor.panes, function(pane) {
-          pane.trigger('resize');
-        });
+        clearInterval(interval);
+        triggerResize();
+        if (typeof callback === 'function') callback();
+        child.removeEventListener('transitionend', listen);
       }
     });
   }

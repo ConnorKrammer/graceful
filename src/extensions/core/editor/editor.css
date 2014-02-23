@@ -1,9 +1,8 @@
-/* TODO: Fix z-index properties to use more reasonable values.
- * TODO: Group rules in more logical fashion, remove redundant rules,
- *       and remove unecessary selectors.
- * TODO: Remove the #command-prompt rules and save them for later in
- *       case they become useful.
- * TODO: Rename .infobar to .title-bar. */
+/* TODO: Rename .infobar to .title-bar. */
+
+/* =======================================================
+ *                        General
+ * ======================================================= */
 
 html, body {
   overflow: hidden;
@@ -12,7 +11,7 @@ html, body {
 
 body {
   height: 100%;
-  display: flex;
+  width: 100%;
 }
 
 .disable-transition {
@@ -24,79 +23,12 @@ body {
   outline-style: none;
 }
 
-/* The command prompt idea was converted into the command bar idea.
-   It was created as a purely CSS way to receive commands, but was
-   too obtrusive (it covered the entire screen).
-
-#command-prompt {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  left: 0;
-  height: 50px;
-  background: rgb(255, 255, 255);
-  border-top: 2px solid rgb(0, 173, 255);
-  transition: top 0.4s ease-out;
-  z-index: 1000000;
-  display: flex;
-  justify-content: center;
-}
-
-#command-prompt.fullscreen {
-  height: auto;
-  top: 0;
-}
-
-#command-prompt .inner-wrapper {
-  position: relative;
-  width: 100%;
-  height: 50%;
-  font-size: 20px;
-  line-height: 1.3;
-  font-family: "open sans";
-  color: #000;
-  overflow-y: auto;
-  text-align: left;
-  display: flex;
-}
-
-#command-prompt .inner-wrapper::-webkit-scrollbar {
-  display: none;
-}
-
-#command-prompt .inner-wrapper > div {
-  width: 100%;
-  padding: 0 30px;
-  outline: none;
-  align-self: flex-end;
-}
-
-#command-prompt .inner-wrapper > div > * {
-  opacity: 0.5;
-  transition: margin-bottom 0.5s ease, opacity 0.5s ease, -webkit-transform 0.5s ease;
-  -webkit-transform-origin: 0 0;
-}
-
-#command-prompt .inner-wrapper > div > *:nth-last-child(2) {
-  margin-bottom: 2em;
-}
-
-#command-prompt .inner-wrapper > div > *:last-child {
-  margin-bottom: -1.3em;
-  opacity: 1;
-  -webkit-transform: scale(1.25);
-  width: 80%;
-  position: relative;
-  font-weight: bold;
-}
-
-#command-prompt .inner-wrapper > div > *:last-child::before {
-  content: ">";
-  position: absolute;
-  left: -18px;
-}
-
-*/
+/* =======================================================
+ *                        Editor
+ *
+ * All panes exist within this element, which takes up the
+ * full size of the screen and does not scroll.
+ * ======================================================= */
 
 #editor {
   position: relative;
@@ -106,11 +38,101 @@ body {
   overflow: hidden;
 }
 
-#editor .pane.input {
+/* =======================================================
+ *                         Panes
+ *
+ * Panes hold content of various types within the editor
+ * (mostly text), and more than one can be open at a time.
+ * If more than one pane is open at once, then each pane
+ * will be divided by a splitter element.
+ *
+ * Because panes use percentage width/heights, surrounding
+ * elements are offset into borders which are incorporated
+ * into the pane's size using box-sizing: border-box. This
+ * preserved full fluidity, with the downside that it is
+ * difficult to work with. Somewhat regretably, CodeMirror
+ * does not seem to like the much nicer flexbox layout.
+ *
+ *                         - - - 
+ *
+ * NOTE: Panes are the most interacted with of any element
+ * in the application. As such, the UI should be fluid and
+ * stay out of the user's way.
+ * ======================================================= */
+
+.pane {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-width: 0;
+  border-style: solid;
+  border-color: transparent;
+  -webkit-user-select: none;
+}
+
+.pane.input {
   font-size: 17px;
   line-height: 1.6;
   font-family: Cousine;
 }
+
+.pane.preview .preview-area {
+  height: 100%;
+  white-space: pre-wrap;
+  overflow-y: auto;
+}
+
+#editor > .pane {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+  box-sizing: border-box;
+  background: rgb(250, 250, 250);
+  outline: 0;
+}
+
+/* Create room for horizontal splitters. */
+#editor > .pane:not(:last-child) {
+  border-right-width: 5px;
+}
+
+/* Create room for vertical splitters. */
+.vertical-splitter-pane > .pane:not(:last-child) {
+  border-bottom-width: 6px;
+}
+
+.vertical-splitter-pane > .pane {
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* Create room for the info bar. */
+#editor > .pane:not(.vertical-splitter-pane),
+.vertical-splitter-pane > .pane {
+  border-top-width: 29px;
+}
+
+/* Create room for the info bar. */
+.vertical-splitter-pane .pane ~ .pane {
+  border-top-width: 24px;
+}
+
+.pane:not(.vertical-splitter-pane) > :first-child {
+  padding: 0 15px;
+}
+
+
+/* =======================================================
+ *                      Command Bar
+ *
+ * The command bar exists at the bottom of a pane, and is
+ * there to accept user input (commands). It is not
+ * persistant, and only exists when the user toggle it.
+ *
+ * It is shifted to the left by 5px in some cases to make
+ * it line up with the edge of the adjacent pane (to make
+ * up for the splitter offset).
+ * ======================================================= */
 
 .command-bar {
   position: absolute;
@@ -129,15 +151,10 @@ body {
   line-height: 1.6;
   white-space: normal;
   background: rgb(250, 250, 250);
-  z-index: 100;
+  z-index: 1;
 }
 
-/* Shift it over to compensate for horizontal splitter. */
-#editor > .pane:not(:first-child) .command-bar {
-  left: -5px;
-}
-
-.command-bar:before {
+.command-bar::before {
   content: ">";
   position: absolute;
   font-size: 20px;
@@ -146,113 +163,273 @@ body {
   left: 5px;
 }
 
-#editor > .pane {
+/* Shift it over to compensate for horizontal splitter. */
+#editor > .pane:not(:first-child) .command-bar {
+  left: -5px;
+}
+
+/* =======================================================
+ *                        Splitters
+ *
+ * Splitters exists between panes and can be dragged to
+ * resize the panes on either side. There are two types of
+ * splitters: vertical and horizontal. Vertical splitters
+ * are only present in vertical split panes.
+ *
+ * This implementation is particularly hack-ish, as it
+ * requires the pane next to the splitter to have a border
+ * equal in width to the splitter's size. The splitter is
+ * then offset into this space. This method is, for now,
+ * necessary, as the pane implementation is percentage
+ * based.
+ * ======================================================= */
+
+.splitter {
   position: relative;
-  transition: width 0.5s cubic-bezier(0.3, 0.4, 0.3, 1);
-  background: rgb(250, 250, 250);
-  outline: 0;
-}
-
-/* Create room for the splitter while retaining fluid width,
- * as the border width is included in the total width due to
- * box-sizing: border-box. */
-#editor > .pane:not(:last-child) {
-  border-right: 5px solid;
-}
-
-/* Same as above, but for height. */
-.vertical-splitter-pane > .pane:not(:last-child) {
-  border-bottom: 6px solid transparent;
-}
-
-.vertical-splitter-pane > .pane {
-  position: relative;
-  height: 100%;
-  box-sizing: border-box;
-  transition: height 0.5s cubic-bezier(0.3, 0.4, 0.3, 1);
-}
-
-/* Extend vertical splitter to touch edge of pane.
- * This compensates for the space added to accomodate
- * the horizontal splitters. */
-.vertical-splitter-pane > .splitter-vertical {
-  padding-right: 5px;
-}
-
-/* Add room for the info bar, similar to how space is made for
- * the splitters. */
-.pane:not(.vertical-splitter-pane) {
-  border-top: 24px solid rgb(250, 250, 250);
-}
-
-/* Same as above. */
-#editor > .pane:not(.vertical-splitter-pane),
-.vertical-splitter-pane > .pane:first-child {
-  border-top: 29px solid rgb(250, 250, 250);
-}
-
-/* Don't allow pane elements to be highlighted by the mouse. */
-.pane {
-  -webkit-user-select: none;
-}
-
-/* Add padding to interior. */
-.pane:not(.vertical-splitter-pane) > :first-child {
-  padding: 0 15px;
-}
-
-#editor > .pane {
   display: inline-block;
-  vertical-align: top;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
+  border-color: black;
+  border-style: solid;
+  background: rgb(250, 250, 250);
+  box-sizing: content-box;
 }
 
-.preview-area {
+.splitter-horizontal {
+  width: 5px;
   height: 100%;
-  white-space: pre-wrap;
-  overflow-y: auto;
+  margin-left: -5px;
+  border-width: 0 0 0 1px;
+  vertical-align: top;
+  cursor: e-resize;
+  transition: width       500ms ease-in,
+              margin-left 500ms ease-in,
+              opacity     200ms ease-in 300ms;
+  z-index: 1;
 }
+
+.splitter-vertical {
+  width: 100%;
+  height: 5px;
+  display: block;
+  margin-top: -6px;
+  margin-left: -5px;
+  padding-right: 5px;
+  border-width: 1px 0 0;
+  cursor: n-resize;
+  transition: height     500ms ease-in,
+              margin-top 500ms ease-in,
+              opacity    200ms ease-in 300ms;
+  z-index: 2;
+}
+
+/* =======================================================
+ *                        Info Bar
+ *
+ * An info bar sits at the top of each pane, and gives the
+ * title of the pane's buffer. It also houses the link
+ * bar.
+ * ======================================================= */
 
 .infobar {
   position: absolute;
-  top: 0;
+  top: -24px;
   height: 24px;
   width: 100%;
   box-sizing: content-box;
-  margin-top: -24px;
   background: rgb(250, 250, 250);
-  z-index: 100;
+  z-index: 1;
 }
 
 .infobar .title {
   position: absolute;
   width: 100%;
+  font-size: 17px;
+  line-height: 1.6;
+  font-family: Cousine;
   line-height: 24px;
   text-align: center;
   vertical-align: middle;
 }
 
-.infobar .status-light {
-  height: 14px;
-  width: 14px;
-  border-radius: 100px;
-  transition: box-shadow 0.5s ease-in, background-color 0.5s ease-in;
-  background: rgb(200, 200, 200);
-}
+/* =======================================================
+ *                        Link Bar
+ *
+ * The link bar exists within the info bar, floated to the
+ * right side. It contains buttons and icons related to
+ * linking panes together, including the status light and
+ * link icon.
+ * ======================================================= */
 
 .link-bar {
   height: 100%;
   float: right;
   display: flex;
   align-items: center;
-  z-index: 1000;
+  z-index: 3;
 }
 
 .link-bar > * {
   margin-right: 10px;
-  z-index: 1000;
+  z-index: 3;
+}
+
+.status-light {
+  height: 14px;
+  width: 14px;
+  border-radius: 100px;
+  transition: box-shadow 500ms ease-in,
+              background-color 500ms ease-in;
+  background: rgb(200, 200, 200);
+}
+
+.pane:focus .status-light,
+.pane.focus .status-light {
+  background: rgb(0, 173, 255);  
+  box-shadow: inset 0px 1px 0px 0px rgba(250, 250, 250, 0.2),
+                    0px 0px 3px 2px rgba(0, 173, 255, 0.2); 
+}
+
+.link-button {
+  background: url("src/assets/images/link-icon.png");
+  width: 22px;
+  height: 10px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.pane.has-link .link-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* =======================================================
+ *               Panes - Opening and Closing 
+ *
+ * When panes are opened and closed, they are animated.
+ * Styles relating to this are listed below.
+ *
+ * It's in this part that all the hacky techniques from
+ * the other sections really stand out -- for smooth
+ * transitions to be really possible, all the odd borders
+ * and offsets need to be transitioned as well, and you
+ * can see that here.
+ * ======================================================= */
+.splitter-horizontal {
+  transition: width       500ms ease-in,
+              margin-left 500ms ease-in,
+              opacity     200ms ease-in 300ms;
+}
+
+.splitter-vertical {
+  transition: height     500ms ease-in,
+              margin-top 500ms ease-in,
+              opacity    200ms ease-in 300ms;
+}
+
+#editor > .pane {
+  transition: width              500ms cubic-bezier(0.3, 0.4, 0.3, 1),
+              opacity            300ms ease-in,
+              border-right-width 300ms ease-in;
+}
+
+.vertical-splitter-pane > .pane {
+  transition: height              500ms cubic-bezier(0.3, 0.4, 0.3, 1),
+              opacity             300ms ease-in,
+              border-top-width    300ms ease-in,
+              border-bottom-width 300ms ease-in;
+}
+
+.infobar {
+  transition: top 300ms ease-in;
+}
+
+.pane.closing {
+  opacity: 0;
+}
+
+#editor > .pane.closing {
+  width: 0 !important; /* Override inline style set with js. */
+  border-right-width: 0;
+}
+
+.vertical-splitter-pane > .pane.closing:first-child + .splitter + .pane {
+  border-top-width: 29px;
+}
+
+.vertical-splitter-pane > .pane.closing {
+  height: 0 !important; /* Override inline style set with js. */
+  border-top-width: 0;
+  border-bottom-width: 0;
+}
+
+.vertical-splitter-pane > .pane.closing > .infobar {
+  top: 0;
+}
+
+.splitter-horizontal.closing {
+  width: 0;
+  opacity: 0;
+  margin-left: 0;
+}
+
+.splitter-vertical.closing {
+  height: 0;
+  opacity: 0;
+  margin-top: 0; 
+}
+
+/* Zero out values without a transition. The correct values will
+ * be transitioned back in when the .opening class is removed. */
+
+.pane.opening {
+  transition: none !important;
+  opacity: 0;
+}
+
+#editor > .pane.opening {
+  width: 0;
+}
+
+.vertical-splitter-pane > .pane.opening {
+  height: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+}
+
+.vertical-splitter-pane > .pane.opening > .infobar {
+  transition: none;
+  top: 0;
+}
+
+/* =======================================================
+ *                        Linking
+ *
+ * Panes can be linked together so that they both work
+ * with the same buffer. When creating or viewing a link,
+ * link lines are used to show the association between
+ * panes. End nodes on a link line (created using :::before
+ * and :::after pseudo-elements) show the direction and
+ * state of a link.
+ *
+ * For example, if a valid link target is hovered over
+ * when making a link, the end node fills with colour and
+ * the outline bounces to show this state to the user.
+ * Likewise, when previewing existing links, the parent
+ * pane in a link chain is shown with a larger end node so
+ * that the user can tell where a particular link or
+ * buffer is originating from.
+ *
+ *                         - - - 
+ *
+ * Note that many CSS properties are interrelated in this
+ * section. Be careful when changing things to also update
+ * dependent properties (such as size and position on end
+ * nodes).
+ * ======================================================= */
+
+/* Creates a bouncing effect for the ring around the line's end node. */
+@-webkit-keyframes bounceOutline {
+  0%   { box-shadow: 0 0 0 0px rgb(250, 250, 250), 0 0 0 2px rgb(0, 173, 255); }
+  100% { box-shadow: 0 0 0 3px rgb(250, 250, 250), 0 0 0 5px rgb(0, 173, 255); }
 }
 
 .link-line-container {
@@ -271,7 +448,7 @@ body {
   -webkit-transform-origin: center top;
   border-radius: 10px;
   box-shadow: 0px 0px 1px 0px rgba(0, 173, 255, 0.5); 
-  z-index: 1000000;
+  z-index: 4;
 }
 
 /* Position dimensions are calculated as follows:
@@ -283,8 +460,8 @@ body {
  * Having box-sizing: border-box set is important, as
  * that is how the line's end node is resized when hovering
  * over a valid link target. */
-.link-line:after,
-.link-line-display:before {
+.link-line::after,
+.link-line-display::before {
   content: "";
   position: absolute;
   right: -18px;
@@ -297,17 +474,17 @@ body {
   transition: border-width 300ms ease-in;
 }
 
-.link-line:before {
+.link-line::before {
   top: -20px;
 }
 
-.link-line:after {
+.link-line::after {
   bottom: -20px;
 }
 
 /* Link display line nodes are smaller. */
-.link-line-display:before,
-.link-line-display:after {
+.link-line-display::before,
+.link-line-display::after {
   width: 26px;
   height: 26px;
   right: -11px;
@@ -315,87 +492,33 @@ body {
   transition: none;
 }
 
-.link-line-display:before {
+.link-line-display::before {
   top: -13px;
 }
 
-.link-line-display:after {
+.link-line-display::after {
   bottom: -13px;
 }
 
 /* Link endpoints should be larger. */
-.link-line.link-endpoint:after {
+.link-line.link-endpoint::after {
   right: -18px;
   width: 40px;
   height: 40px;
   border-width: 5px;
 }
 
-.link-line.link-endpoint:after {
+.link-line.link-endpoint::after {
   bottom: -20px;
   -webkit-animation: bounceOutline 150ms linear 100ms 2 alternate; /* Add the animation. */
 }
 
-/* Creates a bouncing effect for the ring around the line's end node. */
-@-webkit-keyframes bounceOutline {
-  0%   { box-shadow: 0 0 0 0px rgb(250, 250, 250), 0 0 0 2px rgb(0, 173, 255); }
-  100% { box-shadow: 0 0 0 3px rgb(250, 250, 250), 0 0 0 5px rgb(0, 173, 255); }
-}
-
-.link-button {
-  background: url("src/assets/images/link-icon.png");
-  width: 22px;
-  height: 10px;
-  opacity: 0.3;
-  pointer-events: none;
-}
-
-.has-link .link-button {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Light up a focused pane's status light. */
-.pane:focus .infobar .status-light,
-.pane.focus .infobar .status-light {
-  background: rgb(0, 173, 255);  
-  box-shadow: inset 0px 1px 0px 0px rgba(250, 250, 250, 0.2),
-                    0px 0px 3px 2px rgba(0, 173, 255, 0.2); 
-}
-
-.splitter {
-  position: relative;
-  display: inline-block;
-  border-color: black;
-  border-style: solid;
-  background: rgb(250, 250, 250);
-  box-sizing: content-box;
-}
-
-/* The splitter is offset into the room created by
- * adjacent pane's border. NOTE: Changing this value
- * will need a change in the border-width of the pane. */
-.splitter-horizontal {
-  width: 5px;
-  height: 100%;
-  margin-left: -5px;
-  border-width: 0 0 0 1px;
-  vertical-align: top;
-  cursor: e-resize;
-  z-index: 100;
-}
-
-/* Same as .splitter-horizontal. */
-.splitter-vertical {
-  width: 100%;
-  height: 5px;
-  display: block;
-  margin-top: -6px;
-  margin-left: -5px;
-  border-width: 1px 0 0;
-  cursor: n-resize;
-  z-index: 101;
-}
+/* =======================================================
+ *                       CodeMirror
+ *
+ * Manages the styling of any CodeMirror elements as well
+ * as any (default) theme-related styles.
+ * ======================================================= */
 
 .CodeMirror {
   position: relative;
@@ -441,7 +564,7 @@ body {
 }
 
 /* These look odd if styled, since the text that they actually
- * affect doesn't change. */
+ * affect (in markdown) isn't styled as well. */
 .cm-header.cm-header-underline-1,
 .cm-header.cm-header-underline-2 {
   font-size: 1em;
