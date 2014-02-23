@@ -1607,9 +1607,6 @@
       };
     }
 
-    // Prevent lag from over-use.
-    dragHandler = _.throttle(dragHandler, 20);
-
     // Start the drag on mousedown.
     splitter.addEventListener('mousedown', function(event) {
       var children = [];
