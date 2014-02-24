@@ -65,10 +65,10 @@
 
     // Update the content when text changes.
     // Not throttled, since the change event already is.
-    pane.on('change', function() { _this.update(true, true); });
+    pane.on('change.content', function() { _this.update(true, true); });
 
     // Reset everything if the pane switches its buffer.
-    pane.on('changeBuffer', function() { _this.update(true, true, true); });
+    pane.on('change.buffer', function() { _this.update(true, true, true); });
 
     // Update content when scrolling.
     pane.cm.on('scroll', function() { _this.updateContent(); });

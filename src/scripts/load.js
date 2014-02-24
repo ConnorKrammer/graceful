@@ -32,7 +32,8 @@
   graceful.coreLibraries = [
     'lodash/dist/lodash.min.js',
     'q/q.js',
-    'observable/lib/observable.js',
+    'observable.js',
+    'Mouse/Mouse.js',
     'jquery/jquery.min.js'
   ];
 

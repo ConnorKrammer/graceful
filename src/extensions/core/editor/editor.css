@@ -47,9 +47,10 @@ body {
  * Because panes use percentage width/heights, surrounding
  * elements are offset into borders which are incorporated
  * into the pane's size using box-sizing: border-box. This
- * preserved full fluidity, with the downside that it is
- * difficult to work with. Somewhat regretably, CodeMirror
- * does not seem to like the much nicer flexbox layout.
+ * preserves full fluidity, with the downside that it is
+ * less semantic and trickier to modify. Flexbox would be
+ * a good alternative, but seems not to play nicely with
+ * CodeMirror.
  *
  *                         - - - 
  *
@@ -78,6 +79,29 @@ body {
   height: 100%;
   white-space: pre-wrap;
   overflow-y: auto;
+  word-wrap: break-word;
+}
+
+.pane-overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  bottom: 0;
+  left: 0;
+  border-width: 0;
+  border-style: solid;
+  border-color: rgb(250, 250, 250);
+  background: rgb(250, 250, 250);
+  opacity: 0;
+  z-index: 4;
+  box-sizing: content-box;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+}
+
+.showing-link .pane-overlay {
+  opacity: 0.95;
+  pointer-events: auto;
 }
 
 #editor > .pane {
@@ -106,12 +130,15 @@ body {
 
 /* Create room for the info bar. */
 #editor > .pane:not(.vertical-splitter-pane),
-.vertical-splitter-pane > .pane {
+#editor > .pane:not(.vertical-splitter-pane) .pane-overlay,
+.vertical-splitter-pane > .pane,
+.vertical-splitter-pane > .pane .pane-overlay {
   border-top-width: 29px;
 }
 
 /* Create room for the info bar. */
-.vertical-splitter-pane .pane ~ .pane {
+.vertical-splitter-pane .pane ~ .pane,
+.vertical-splitter-pane .pane ~ .pane .pane-overlay {
   border-top-width: 24px;
 }
 
@@ -149,7 +176,7 @@ body {
   line-height: 1.6;
   white-space: normal;
   background: rgb(250, 250, 250);
-  z-index: 1;
+  z-index: 4;
 }
 
 .command-bar::before {
@@ -169,17 +196,19 @@ body {
 /* =======================================================
  *                        Splitters
  *
- * Splitters exists between panes and can be dragged to
+ * Splitters exist between panes and can be dragged to
  * resize the panes on either side. There are two types of
  * splitters: vertical and horizontal. Vertical splitters
- * are only present in vertical split panes.
+ * separate two panes stacked vertically, while horizontal
+ * splitters separate two panes side by side to each other.
+ * Vertical splitters are only present in vertical split
+ * panes.
  *
  * This implementation is particularly hack-ish, as it
  * requires the pane next to the splitter to have a border
  * equal in width to the splitter's size. The splitter is
- * then offset into this space. This method is, for now,
- * necessary, as the pane implementation is percentage
- * based.
+ * then offset into this space. This method is necessary
+ * for now, as the pane implementation is percentage-based.
  * ======================================================= */
 
 .splitter {
@@ -262,7 +291,6 @@ body {
   float: right;
   display: flex;
   align-items: center;
-  z-index: 3;
 }
 
 .link-bar > * {
@@ -375,25 +403,25 @@ body {
   margin-top: 0; 
 }
 
-/* Zero out values without a transition. The correct values will
- * be transitioned back in when the .opening class is removed. */
-
-.pane.opening {
-  transition: none !important;
+/* For the next few rules, zero out values instantly (sans transition).
+ * The correct values will be transitioned back in when the .instant-open
+ * class is removed again. */
+.pane.instant-open {
+  transition: none !important; /* Override inline style set with js. */
   opacity: 0;
 }
 
-#editor > .pane.opening {
+#editor > .pane.instant-open {
   width: 0;
 }
 
-.vertical-splitter-pane > .pane.opening {
+.vertical-splitter-pane > .pane.instant-open {
   height: 0;
   border-top-width: 0;
   border-bottom-width: 0;
 }
 
-.vertical-splitter-pane > .pane.opening > .title-bar {
+.vertical-splitter-pane > .pane.instant-open > .title-bar {
   transition: none;
   top: 0;
 }
@@ -404,8 +432,8 @@ body {
  * Panes can be linked together so that they both work
  * with the same buffer. When creating or viewing a link,
  * link lines are used to show the association between
- * panes. End nodes on a link line (created using :::before
- * and :::after pseudo-elements) show the direction and
+ * panes. End nodes on a link line (created using ::before
+ * and ::after pseudo-elements) show the direction and
  * state of a link.
  *
  * For example, if a valid link target is hovered over
@@ -426,89 +454,126 @@ body {
 
 /* Creates a bouncing effect for the ring around the line's end node. */
 @-webkit-keyframes bounceOutline {
-  0%   { box-shadow: 0 0 0 0px rgb(250, 250, 250), 0 0 0 2px rgb(0, 173, 255); }
+  0%   { box-shadow: 0 0 0 0px rgb(250, 250, 250), 0 0 0 2px rgb(0, 173, 255); , 5)}
   100% { box-shadow: 0 0 0 3px rgb(250, 250, 250), 0 0 0 5px rgb(0, 173, 255); }
 }
 
-.link-line-container {
+.link-line-wrapper {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-}
-
-.link-line {
-  position: absolute;
-  width: 4px;
-  background: rgb(0, 173, 255);
-  -webkit-transform-origin: center top;
-  border-radius: 10px;
-  box-shadow: 0px 0px 1px 0px rgba(0, 173, 255, 0.5); 
   z-index: 4;
 }
 
-/* Position dimensions are calculated as follows:
- *
- * top:    -(width / 2)
- * bottom: -(width / 2)
- * right:  -(width - linewidth) / 2
- * 
- * Having box-sizing: border-box set is important, as
- * that is how the line's end node is resized when hovering
- * over a valid link target. */
-.link-line::after,
-.link-line-display::before {
-  content: "";
+.link-line-container {
   position: absolute;
-  right: -18px;
-  width: 40px;
-  height: 40px;
+  left: -2px;
+  width: 4px;
+  border-radius: 10px;
+  background: rgb(0, 173, 255);
+  -webkit-transform-origin: center top;
+  -webkit-backface-visibility: hidden;
+  opacity: 0;
+}
+
+.display-container.opening {
+  transition: opacity 100ms ease-in !important;
+}
+
+.display-container.closing {
+  transition: height 300ms ease-in, opacity 200ms ease-in !important;
+  opacity: 0 !important;
+}
+
+.link-line-container :first-child,
+.link-line-container :last-child {
+  position: absolute;
+
+  /* An awful hack to make positioning relative to size. */
+  font-size: 26px;
+  left: -0.5em;
+  width: 1em;
+  height: 1em;
+  margin: 0 50% 0 50%;
+
   border-radius: 1000px;
-  border: 15px solid rgb(250, 250, 250);
+  border: 10px solid rgb(250, 250, 250);
   box-shadow: 0 0 0 2px rgb(0, 173, 255);
   background-color: rgb(0, 173, 255);
-  transition: border-width 300ms ease-in;
+
+  transition: width        300ms ease-in,
+              height       300ms ease-in,
+              left         300ms ease-in,
+              top          300ms ease-in,
+              border-width 300ms ease-in;
 }
 
-.link-line::before {
-  top: -20px;
+.link-line-container :first-child {
+  top: -0.5em;
 }
 
-.link-line::after {
-  bottom: -20px;
+.link-line-container :last-child {
+  bottom: -0.5em;
 }
 
-/* Link display line nodes are smaller. */
-.link-line-display::before,
-.link-line-display::after {
-  width: 26px;
-  height: 26px;
-  right: -11px;
-  border-width: 10px;
-  transition: none;
+.link-line-container.link-container :first-child {
+  display: none;
 }
 
-.link-line-display::before {
-  top: -13px;
+.link-container :last-child {
+  border-width: 15px;
 }
 
-.link-line-display::after {
-  bottom: -13px;
+.link-container :last-child,
+.link-line-container .link-endpoint {
+  font-size: 40px;
 }
 
-/* Link endpoints should be larger. */
-.link-line.link-endpoint::after {
-  right: -18px;
-  width: 40px;
-  height: 40px;
+.link-line-container .link-endpoint {
   border-width: 5px;
+  -webkit-animation: bounceOutline 150ms linear 100ms 2 alternate;
 }
 
-.link-line.link-endpoint::after {
-  bottom: -20px;
-  -webkit-animation: bounceOutline 150ms linear 100ms 2 alternate; /* Add the animation. */
+.link-line-container.display-container .link-endpoint.invalid-target {
+  border-width: 15px;
+  -webkit-animation: none;
+}
+
+.display-container :last-child:not(.link-endpoint) {
+  -webkit-animation: bounceOutline 150ms linear 100ms 2 alternate;
+}
+
+.display-container :last-child:not(.link-endpoint).invalid-target {
+  -webkit-animation: none;
+}
+
+.link-nexus {
+  position: absolute;
+  font-size: 26px;
+  left: -0.5em;
+  top: -0.5em;
+  width: 1em;
+  height: 1em;
+  border-radius: 1000px;
+  background: rgb(250, 250, 250);
+  box-shadow: 0 0 0 2px rgba(0, 173, 255, 0.8);
+  transition-property: width, height, left, top, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
+  opacity: 0;
+  z-index: -1;
+}
+
+.link-nexus.link-endpoint {
+  font-size: 40px;
+}
+
+.link-nexus.visible {
+  font-size: 100px;
+  opacity: 1;
 }
 
 /* =======================================================
@@ -561,8 +626,8 @@ body {
   font-weight: bold;
 }
 
-/* These look odd if styled, since the text that they actually
- * affect (in markdown) isn't styled as well. */
+/* These underlines look odd if styled, since the headers that
+ * they apply to (in markdown syntax) aren't styled to match. */
 .cm-header.cm-header-underline-1,
 .cm-header.cm-header-underline-2 {
   font-size: 1em;

@@ -25,14 +25,56 @@
    * @todo Allow a more intuitive way to specify the linked pane.
    *
    * @param {Editor.Pane} pane - The pane to link.
-   * @param {Integer) paneNumber - The index of the pane to create the link with.
+   * @param {Integer) arg - The index of the pane to create the link with,
+   *                        or the keyword 'break'.
    */
   graceful.editor.defineCommand({
     name: 'link',
     argCount: 1,
-    func: function(pane, paneNumber) {
-      paneNumber = parseInt(paneNumber, 10);
-      pane.linkToPane(graceful.editor.panes[paneNumber]);
+    func: function(pane, arg) {
+      var paneNumber = parseInt(arg, 10);
+      var targetPane, deferred, result;
+
+      if (!arg) {
+        throw new Error('No argument passed to command.');
+      }
+
+      if (arg === 'break') {
+        result = pane.linkToPane(false);
+        if (!result) return;
+      }
+      else if (!isNaN(paneNumber)) {
+        if (paneNumber < 0 || paneNumber >= graceful.editor.panes.length) {
+          throw new Error("Invalid pane number '" + paneNumber + "' specified.");
+        }
+
+        targetPane = graceful.editor.panes[paneNumber];
+
+        if (targetPane === pane.linkedPane || (targetPane === pane && !pane.linkedPane)) {
+          return;
+        }
+        else if (targetPane === pane) {
+          pane.linkToPane(false, true);
+        } 
+        else {
+          pane.linkToPane(targetPane);
+        }
+      }
+      else {
+        return;
+      }
+
+      if (!pane.linkManager.isShowingLink) return;
+
+      deferred = Q.defer();
+
+      // Allow linking animation to finish before resolving.
+      pane.linkManager.containers.display.addEventListener('transitionend', function listener(event) {
+        deferred.resolve();
+        pane.linkManager.containers.display.removeEventListener('transitionend', listener);
+      });
+
+      return deferred.promise;
     }
   });
 
@@ -49,6 +91,11 @@
     argCount: 1,
     func: function(pane, paneNumber) {
       paneNumber = parseInt(paneNumber, 10) || 0;
+
+      if (paneNumber < 0 || paneNumber >= graceful.editor.panes.length) {
+        throw new Error("Invalid pane number '" + paneNumber + "' specified.");
+      }
+
       graceful.editor.panes[paneNumber].focus();
     },
     focusFunc: function(editor) {
@@ -67,7 +114,7 @@
    * @return {Promise} A promise for the split.
    */
   function addSplit(pane, direction, type, link) {
-    type = type.toLowerCase();
+    type = type ? type.toLowerCase() : '';
 
     // Set pane type.
     if      (type === 'input')   type = Editor.InputPane;
@@ -78,6 +125,9 @@
     var deferred = Q.defer();
     var newPane  = graceful.editor.addPane(type, new Editor.Buffer(), direction, pane);
     var property = direction === 'vertical' ? 'height' : 'width';
+
+    // If no pane was added, just return.
+    if (!newPane) return;
 
     // Link the pane.
     if (link) newPane.linkToPane(pane);
@@ -124,6 +174,34 @@
     argCount: 2,
     func: function(pane, type, link) {
       return addSplit(pane, 'vertical', type, link);
+    }
+  });
+
+  /**
+   * Begins managing the links on the specified panes, or
+   * all the panes if none are specified.
+   *
+   * @param {Editor.Pane} pane - The current pane context (not used).
+   * @param {Integer[]} targets - The panes to manage.
+   */
+  graceful.editor.defineCommand({
+    name: 'manage',
+    func: function(pane) {
+      var deferred = Q.defer();
+
+      if (!graceful.editor.isManagingLinks) {
+        graceful.editor.manageLinks();
+      } else {
+        graceful.editor.endManageLinks();
+      }
+
+      // Which pane is used doesn't matter.
+      pane.overlayElement.addEventListener('transitionend', function listener(event) {
+        deferred.resolve();
+        pane.linkManager.containers.display.removeEventListener('transitionend', listener);
+      });
+
+      return deferred.promise;
     }
   });
 

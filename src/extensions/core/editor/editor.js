@@ -11,12 +11,12 @@
 !function(global) {
   'use strict';
 
-  // Counter for buffer IDs.
-  var currentBufferID = 0;
-
 /* =======================================================
  *                         Buffer
  * ======================================================= */
+
+  // Counter for buffer IDs.
+  var currentBufferID = 0;
 
   /**
    * The Buffer class.
@@ -35,7 +35,7 @@
     var index, filetype;
 
     // Mix in event handling.
-    Observable(this);
+    Observable.mixin(this);
 
     // Get a unique ID.
     this.id = getBufferID();
@@ -67,7 +67,7 @@
     this.rootDoc.on('change', _.throttle(function(doc, change) {
       _this.text = doc.getValue();
       _this.markClean(false);
-      _this.trigger('change', [_this]);
+      _this.trigger('change.content', _this);
     }, 50));
 
     return this;
@@ -93,7 +93,7 @@
     this.title = title;
 
     // Notify listeners that the filepath changed.
-    this.trigger('changeFilepath', [filepath, title]);
+    this.trigger('change.filepath', [filepath, title]);
   };
 
   /**
@@ -259,11 +259,11 @@
   };
 
 /* =======================================================
- *                       StatusLight
+ *                       LinkManager
  * ======================================================= */
 
   /**
-   * The StatusLight class.
+   * The LinkManager class.
    *
    * Manages the visual aspects of linking two panes, namely the handlers on the click
    * and mousemove events, and the drawing of the link line to represent this action.
@@ -274,95 +274,342 @@
    * For line drawing method, see {@link http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html|here}.
    *
    * @todo Tidy up event handling.
-   * @todo Allow rearrangement of linking order by dragging around the nodes
-   *       on the ends of link lines.
+   * @todo Rename event handlers to be more consistent.
+   * @todo Move event handlers out of the constructor. Right now every instance gets its own
+   *       copy of each handler. (Suggestions: Move to object prototype.)
+   * @todo Simplify all the logic used to determine display/link states. (Idea: Implement a state
+   *       machine to grab the start/end positions in showLink().)
    * 
    * @constructor
    * @param {Pane} pane - The pane to attach the status light to.
    */
-  function StatusLight(pane) {
+  function LinkManager(pane) {
     var _this = this;
     var timer = null;
+    var manageEnd = false;
 
     // Keep a reference to the pane.
     this.pane = pane;
 
-    // Event handlers.
-    this.drawLinkLineMoveHandler = _.throttle(this.drawLinkLine.bind(this), 10); 
-    this.startLinkClickHandler = this.startLink.bind(this);
-    this.endLinkClickHandler = this.endLink.bind(this);
+    // For storing the link line's position.
+    this.drawInfo = {
+      link:    { origin: NaN, destination: NaN },
+      display: { origin: NaN, destination: NaN },
+    };
+
+    // For storing hover states.
+    this.hoverState = {
+      start: false, // Not currently used.
+      end: false,
+      nexus: false
+    };
+
+    // Visiblility flag.
+    this.isShowingLink = false;
+
+    // Removal flag.
+    this.isRemoving = false;
+
+    // Linking flag.
+    this.isLinking = false;
+
+    // Display-link flag.
+    this.isDisplayLinking = false;
+
+    // Hover-preview flag.
+    this.isPreviewingLink = false;
+
+    // Create the containers.
+    this.containers = {
+      link: document.createElement('div'),
+      display: document.createElement('div')
+    };
+
+    // Create the end nodes.
+    this.nodes = {
+      linkStart: document.createElement('div'),
+      linkEnd: document.createElement('div'),
+      displayStart: document.createElement('div'),
+      displayEnd: document.createElement('div'),
+      nexus: document.createElement('div')
+    };
+
+    // Set the class names.
+    this.containers.link.className    = 'link-line-container link-container';
+    this.containers.display.className = 'link-line-container display-container';
+    this.nodes.linkEnd.className      = 'link-endpoint';
+    this.nodes.nexus.className        = 'link-nexus';
+
+    // Add the link elements.
+    this.pane.editor.linkContainer.appendChild(this.containers.link);
+    this.containers.link.appendChild(this.nodes.linkStart);
+    this.containers.link.appendChild(this.nodes.linkEnd);
+
+    // Add the display elements.
+    this.pane.editor.linkContainer.appendChild(this.containers.display);
+    this.pane.editor.linkContainer.appendChild(this.nodes.nexus);
+    this.containers.display.appendChild(this.nodes.displayStart);
+    this.containers.display.appendChild(this.nodes.displayEnd);
+
+    // Keep track of what elements are being hovered over.
+    // @todo: Test performance to see if throttling would be beneficial.
+    document.addEventListener('mousemove', _.throttle(function(event) {
+      var endRadius           = _this.nodes.displayEnd.offsetWidth / 2;
+      var nexusRadius         = _this.nodes.nexus.offsetWidth / 2;
+      var extendedNexusRadius = nexusRadius + endRadius;
+      var oldNexusState       = _this.hoverState.nexus;
+      var mousePosition       = { x: mouse.x, y: mouse.y };
+      var extendedHoverState;
+
+
+      // Check which elements are being hovered over.
+      _this.hoverState.end   = pointInCircle(_this.drawInfo.display.destination, mousePosition, endRadius);
+      _this.hoverState.nexus = pointInCircle(_this.drawInfo.display.origin, mousePosition, nexusRadius);
+
+      // The same as the nexus hover state, but with a buffer region.
+      extendedHoverState = _this.hoverState.nexus || pointInCircle(_this.drawInfo.display.origin, mousePosition, extendedNexusRadius);
+
+      if (_this.pane.linkingPanes.length) {
+        // If a linking pane's end node is hovered over and is within the
+        // nexus buffer region, keep the nexus hover state set to true.
+        if (extendedHoverState && !_this.hoverState.nexus) {
+          _.forEach(_this.pane.linkingPanes, function(pane) {
+            if (pane.linkManager.hoverState.end) _this.hoverState.nexus = true;
+          });
+        }
+
+        // Update the displayed links if the nexus state toggles.
+        if (oldNexusState !== _this.hoverState.nexus) {
+          updateDisplayedLinks(_this.pane, true);
+        }
+      }
+    }, 10));
+
+    // Draw the link line on mouse move.
+    this.drawLinkLineMoveHandler = function(event) {
+      _this.drawLinkLine({ x: mouse.x, y: mouse.y });
+    };
+
+    // Start a link on mouse click.
+    this.startLinkClickHandler = function(event) {
+      _this.startLink(event);
+    };
+
+    // End a link on mouse click.
+    this.endLinkClickHandler = function(event) {
+      _this.endLink(true);
+    };
+
+    // End a link on ESC key press.
     this.endLinkKeyHandler = function(event) {
-      if (event.keyCode === 27) {
-        _this.endLink(false);
-      }
+      if (event.keyCode !== 27 || !_this.isLinking) return;
+      event.stopPropagation();
+      _this.endLink(false);
     };
-    this.transitionEndHandler = function(event) {
-      if (event.propertyName === 'opacity') {
-        // Reset property values.
-        this.style.transition = '';
-        this.style.height     = '';
-        this.style.opacity    = '';
 
-        // Remove the link-endpoint class if present.
-        event.target.classList.remove('link-endpoint');
-
-        // Remove the line.
-        _this.pane.editor.linkLineContainer.removeChild(event.target);
-      }
-    };
+    // Display a link on mouse over.
     this.showLinkHoverHandler = function(event) {
-      if (!_this.isShowingLink) {
-        timer = window.setTimeout(_this.showLink.bind(_this), 150, event);
+      if (!_this.isShowingLink && !timer) {
+        timer = window.setTimeout(function() {
+          var pane = _this.pane;
+
+          while (pane) {
+            pane.linkManager.isPreviewingLink = true;
+            pane = pane.linkedPane;
+          }
+            
+          _this.showLink(true, true, false);
+        }, 150);
       }
     }
+
+    // Hide a link on mouse out.
     this.hideLinkHoverHandler = function(event) {
-      if (_this.isShowingLink && timer) {
+      var pane;
+
+      if (timer) {
         window.clearTimeout(timer);
         timer = null;
+
+        pane = _this.pane;
+        while (pane) {
+          pane.linkManager.isPreviewingLink = false;
+          pane = pane.linkedPane;
+        }
+
         _this.hideLink();
       }
     };
+
     this.breakLinkClickHandler = function(event) {
+      var pane;
+
       // Stop this from triggering the end of a link.
       event.stopPropagation();
 
-      // Break the link and update displayed links.
-      _this.hideLink(false);
+      pane = _this.pane;
+      while (pane) {
+        pane.linkManager.isPreviewingLink = false;
+        pane = pane.linkedPane;
+      }
+
+      _this.hideLink(true);
       _this.pane.linkToPane(false);
-      updateDisplayedLinks(_this.pane);
     };
+    
+    // Draw the display line on mouse move.
+    function followMouse(event) {
+      // Abort if not showing the link.
+      if (!_this.isShowingLink) {
+        endManageLinks(false);
+        return;
+      }
 
-    // Create the link line element.
-    this.linkLine = document.createElement('div');
-    this.linkLine.className = 'link-line';
+      var mousePosition = { x: mouse.x, y: mouse.y };
 
-    // Create the link display element.
-    this.linkDisplayLine = document.createElement('div');
-    this.linkDisplayLine.className = 'link-line link-line-display';
+      if (manageEnd) {
+        _this.containers.display.style.transition = 'none';
+        drawLine(_this.containers.display, _this.drawInfo.display.origin, mousePosition);
+        _this.drawInfo.display.destination = mousePosition;
 
-    // Create the link bar.
-    this.linkBar = document.createElement('div');
-    this.linkBar.className = 'link-bar';
+        var targetPane = _this.pane.editor.getPaneAtCoordinate(mousePosition);
+        _this.nodes.displayEnd.classList.toggle('invalid-target', !_this.pane.canLinkToPane(targetPane));
+      }
+    }
+    
+    // Begin link management on mouse click.
+    function startManageLinks(event) {
+      if (!_this.isShowingLink) return;
 
-    // Create the link button.
-    this.linkButton = document.createElement('div');
-    this.linkButton.className = 'link-button';
-    this.linkButton.addEventListener('mouseover', this.showLinkHoverHandler);
-    this.linkButton.addEventListener('mouseout', this.hideLinkHoverHandler);
-    this.linkButton.addEventListener('click', this.breakLinkClickHandler);
+      manageEnd = _this.hoverState.end;
 
-    // Create the status light.
-    this.linkLight = document.createElement('div');
-    this.linkLight.className = 'status-light';
-    this.linkLight.addEventListener('mouseup', this.startLinkClickHandler);
+      // Set event listeners if clicking on an end node.
+      if (manageEnd) {
+        _this.isDisplayLinking = true;
+        event.stopImmediatePropagation();
+        document.removeEventListener('click', startManageLinks);
+        document.addEventListener('click', endManageLinks);
+        document.addEventListener('mousemove', followMouse);
+      }
+    }
+    
+    function endManageLinks(makeLink) {
+      var targetPane, hasClass, mousePosition, endRadius, hoverEnd;
+      if (typeof makeLink === 'undefined') makeLink = true;
 
-    // Add elements to the DOM.
-    pane.titleBar.appendChild(this.linkBar);
-    this.linkBar.appendChild(this.linkButton);
-    this.linkBar.appendChild(this.linkLight);
+      // Update state.
+      _this.isDisplayLinking = false;
 
-    // Update displayed links on pane resize.
-    pane.on('resize', function() { updateDisplayedLinks(pane); });
+      // Remove the classname potentially added in followMouse(). Cache old state.
+      hasClass = _this.nodes.displayEnd.classList.contains('invalid-target');
+      _this.nodes.displayEnd.classList.remove('invalid-target');
+
+      if (makeLink) {
+        targetPane = _this.pane.editor.getPaneAtCoordinate(_this.drawInfo.display.destination);
+
+        if (!targetPane) {
+          _this.showLink(false);
+        } else {
+          // Necessary to see if the link should be ended or chained with another. (2nd condition)
+          mousePosition = { x: mouse.x, y: mouse.y };
+          endRadius = targetPane.linkManager.nodes.displayEnd.offsetWidth / 2;
+          hoverEnd = pointInCircle(targetPane.linkManager.drawInfo.display.destination, mousePosition, endRadius);
+
+          if (targetPane === _this.pane) {
+            _this.pane.linkToPane(false, true);
+          }
+          else if (!targetPane.linkManager.isDisplayLinking && hoverEnd) {
+            // Restore old state and exit without removing event listeners.
+            _this.isDisplayLinking = true;
+            _this.nodes.displayEnd.classList.toggle('invalid-target', hasClass);
+            return;
+          }
+          else if (_this.pane.canLinkToPane(targetPane)) {
+            _this.pane.linkToPane(targetPane);
+          }
+          else {
+            _this.showLink(false);
+          }
+        }
+      } else {
+        _this.showLink(false);
+      }
+
+      document.addEventListener('click', startManageLinks);
+      document.removeEventListener('click', endManageLinks);
+      document.removeEventListener('mousemove', followMouse);
+    }
+
+    this.pane.on('link', function(linkedPane, oldPane) {
+      if (!_this.isDisplayLinking || linkedPane) {
+        updateDisplayedLinks(_this.pane, true, false);
+      } else {
+        _this.nodes.displayEnd.classList.toggle('link-endpoint', !linkedPane);
+      }
+
+      if (_this.isDisplayLinking && !_this.isRemoving && !(oldPane && oldPane.linkManager.isRemoving)) {
+        endManageLinks(false);
+      }
+    });
+
+    this.pane.on('resize', _.throttle(function() { 
+      var clientRect;
+
+      if (_this.isDisplayLinking) {
+        clientRect = _this.pane.wrapper.getBoundingClientRect();
+        _this.drawInfo.display.destination = {
+          x: mouse.x,
+          y: mouse.y
+        };
+        _this.drawInfo.display.origin = {
+          x: clientRect.left + clientRect.width  / 2,
+          y: clientRect.top  + clientRect.height / 2
+        }
+        drawLine(_this.containers.display, _this.drawInfo.display.origin,
+          _this.drawInfo.display.destination);
+      }
+      else {
+        // In drawLine, make it so that it doesn't force a reflow if the
+        // transition doesn't need toggling.
+        updateDisplayedLinks(_this.pane, false);
+      }
+
+      if (_this.isLinking && !_this.isRemoving) {
+        _this.drawLinkLine(_this.drawInfo.link.destination);
+      }
+    }, 20));
+
+    this.pane.on('remove.start', function() {
+      _this.isRemoving = true;
+
+      // Transition out the link lines.
+      _this.containers.link.classList.add('closing');
+      _this.containers.display.classList.add('closing');
+
+      _this.endLink(false, true);
+    });
+
+    this.pane.on('remove.end', function() {
+      _this.pane.editor.linkContainer.removeChild(_this.containers.display);
+      _this.pane.editor.linkContainer.removeChild(_this.containers.link);
+    });
+
+    this.pane.on('add.start', function() {
+      _this.containers.link.classList.add('opening');
+      _this.containers.display.classList.add('opening');
+    });
+
+    this.pane.on('add.end', function() {
+      _this.containers.link.classList.remove('opening');
+      _this.containers.display.classList.remove('opening');
+    });
+
+    // Event listeners.
+    document.addEventListener('click', startManageLinks);
+    this.pane.statusLight.addEventListener('mouseup', this.startLinkClickHandler);
+    this.pane.linkButton.addEventListener('mouseover', this.showLinkHoverHandler);
+    this.pane.linkButton.addEventListener('mouseout', this.hideLinkHoverHandler);
+    this.pane.linkButton.addEventListener('click', this.breakLinkClickHandler);
 
     return this;
   }
@@ -372,36 +619,47 @@
    *
    * @param {MouseEvent} event - The click event to handle.
    */
-  StatusLight.prototype.startLink = function(event) {
+  LinkManager.prototype.startLink = function(event) {
     // Prevent this click from bubbling up to the document where it would trigger
-    // the handler immediately. This also allows chaining of several pane's
-    // links (since a click on another status light won't trigger the end click
+    // the handler immediately. This also allows chaining several pane's links
+    // (since a click on another status light won't trigger the end click
     // handler), which was unexpected but not unwelcome.
     event.stopPropagation();
 
+    // Whether a link is in progress.
+    this.isLinking = true;
+
+    // Fade in the line.
+    this.containers.link.style.transition = '';
+    this.containers.link.style.opacity = 1;
+
     // Add the link line and add event listeners.
-    this.pane.editor.linkLineContainer.appendChild(this.linkLine);
     document.addEventListener('mousemove', this.drawLinkLineMoveHandler);
     document.addEventListener('mouseup', this.endLinkClickHandler);
     document.addEventListener('keydown', this.endLinkKeyHandler);
 
     // Remove the start listener.
-    this.linkLight.removeEventListener('mouseup', this.startLinkClickHandler);
+    this.pane.statusLight.removeEventListener('mouseup', this.startLinkClickHandler);
   };
 
   /**
    * Resets the link process and links the panes based upon the mouse position.
    *
+   * If makeLink is false, then the link process will be ended without
+   * linking any panes together.
+   *
    * @param {Boolean} [makeLink=true] - Whether to link the panes, if possible.
    */
-  StatusLight.prototype.endLink = function(makeLink) {
-    makeLink = makeLink || (typeof makeLink === 'undefined') ? true : false;
+  LinkManager.prototype.endLink = function(makeLink) {
+    if (typeof makeLink === 'undefined') makeLink = true;
 
-    // Reset the link line's state.
-    this.linkLine.style.transition = 'height 0.3s ease, opacity 0.2s ease';
-    this.linkLine.style.height     = '0px';
-    this.linkLine.style.opacity    = 0;
-    this.linkLine.addEventListener('transitionend', this.transitionEndHandler);
+    // Whether a link is in progress.
+    this.isLinking = false;
+
+    // Fade out the line.
+    this.containers.link.style.transition = 'height 500ms ease, opacity 300ms ease';
+    this.containers.link.style.height     = 0;
+    this.containers.link.style.opacity    = 0;
 
     // Remove event listeners.
     document.removeEventListener('mousemove', this.drawLinkLineMoveHandler);
@@ -409,16 +667,12 @@
     document.removeEventListener('keydown', this.endLinkKeyHandler);
 
     // Add the start listener again.
-    this.linkLight.addEventListener('mouseup', this.startLinkClickHandler);
+    this.pane.statusLight.addEventListener('mouseup', this.startLinkClickHandler);
 
     // Look for a pane under the cursor and link to it.
     if (makeLink) {
-      var targetPane = this.pane.editor.getPaneAtCoordinate(this.destinationX, this.destinationY);
+      var targetPane = this.pane.editor.getPaneAtCoordinate(this.drawInfo.link.destination);
       if (targetPane) this.pane.linkToPane(targetPane);
-
-      if (this.pane.editor.container.classList.contains('showing-links')) {
-        updateDisplayedLinks(this.pane);
-      }
     }
   };
 
@@ -426,167 +680,165 @@
    * Draws a link line between the status light and the center of the linked pane.
    * Utilizes drawLine().
    *
-   * @param {Boolean} [recursive=true] If true, shows links recursively.
+   * @param {Boolean} [recursive=true]  - Whether to show links recursively.
+   * @param {Boolean} [transition=true] - Whether to transition changes.
+   * @param {Boolean} [animateEnd=true] - Whether to add the 'bounce' effect to the end node, if applicable.
    */
-  StatusLight.prototype.showLink = function(recursive) {
-    if (typeof recursive === 'undefined') recursive = true;
+  LinkManager.prototype.showLink = function(recursive, transition, animateEnd) {
+    var source, target, sourceClientRect, targetClientRect, origin, destination, isEndNode, isLinkNexus;
 
-    // Don't show the link if it doesn't exist.
-    if (!this.pane.linkedPane) return;
+    // Set defaults.
+    if (typeof recursive  === 'undefined') recursive  = true;
+    if (typeof transition === 'undefined') transition = true;
+    if (typeof animateEnd === 'undefined') animateEnd = true;
+
+    isEndNode = !this.pane.linkedPane;
+    isLinkNexus = this.pane.linkingPanes.length && this.hoverState.nexus;
+
+    // Control end-node size and animation.
+    if (!animateEnd) {
+      this.nodes.displayEnd.classList.toggle('link-endpoint', isEndNode);
+      this.nodes.displayEnd.style.transition = 'none';
+      this.nodes.displayEnd.offsetHeight; // Trigger reflow.
+      this.nodes.displayEnd.style.transition = '';
+    }
+    else if (!this.isShowingLink && isEndNode && !this.pane.wrapper.classList.contains('showing-link')) {
+      this.nodes.displayEnd.classList.remove('link-endpoint');
+      this.nodes.displayEnd.style.transition = 'none';
+      this.nodes.displayEnd.offsetHeight; // Trigger reflow.
+      this.nodes.displayEnd.style.transition = '';
+      this.nodes.displayEnd.classList.add('link-endpoint');
+    }
+    else {
+      this.nodes.displayEnd.classList.toggle('link-endpoint', isEndNode);
+    }
+
+    // Conditionally toggle classnames.
+    this.nodes.nexus.classList.toggle('link-endpoint', isEndNode);
+    this.nodes.nexus.classList.toggle('visible', isLinkNexus);
+
+    // Promote lines with link endpoint nodes to the top, so that they don't get
+    // overlapped by non-endpoint nodes.
+    this.containers.display.style.zIndex = isEndNode ? 1 : '';
+
+    // Set transition properties, and fade in the line.
+    this.containers.display.style.transition = this.isShowingLink && transition
+      ? 'opacity 400ms ease, height 250ms ease-out, -webkit-transform 250ms ease-out'
+      : 'opacity 400ms ease';
+    this.containers.display.style.opacity = 1;
+
+    // Get the light element's position.
+    source = this.pane.wrapper;
+    sourceClientRect = source.getBoundingClientRect();
+
+    if (!this.pane.linkedPane) {
+      // Just show the node centered on the pane.
+      target = source;
+      targetClientRect = sourceClientRect;
+    } else {
+      // Show the node on the linked pane.
+      target = this.pane.linkedPane.wrapper;
+      targetClientRect = target.getBoundingClientRect();
+    }
+
+    // Calculate the source position.
+    origin = {
+      x: sourceClientRect.left + sourceClientRect.width  / 2,
+      y: sourceClientRect.top  + sourceClientRect.height / 2
+    };
+
+    // Calculate the destination position.
+    destination = {
+      x: targetClientRect.left + targetClientRect.width  / 2,
+      y: targetClientRect.top  + targetClientRect.height / 2
+    };
+
+    // Place the destination on a ring around the target pane's center.
+    if (this.pane.linkedPane && this.pane.linkedPane.linkManager.hoverState.nexus) {
+      destination = getClosestCirclePoint(origin, destination, 50);
+    }
+
+    // Position the nexus at the start node position.
+    if (isLinkNexus) {
+      this.nodes.nexus.style.webkitTransform = 'translate(' + origin.x + 'px, ' + origin.y + 'px)';
+    }
+
+    // Store position info.
+    this.drawInfo.display.origin = origin;
+    this.drawInfo.display.destination = destination;
+
+    // Position and size the line.
+    drawLine(this.containers.display, origin, destination);
 
     // Set flag.
     this.isShowingLink = true;
 
-    // Add the link line to the document body.
-    // This is done first so that offsetWidth can be accessed.
-    if (!this.linkDisplayLine.parentElement) {
-      fadeIn(this.pane.editor.linkLineContainer, this.linkDisplayLine, 200, 'ease-in');
-    }
-
-    // Get the light element's position.
-    var source    = this.pane.wrapper;
-    var target    = this.pane.linkedPane.wrapper;
-    var position1 = source.getBoundingClientRect();
-    var position2 = target.getBoundingClientRect();
-
-    // Calculate the source position.
-    var origin = {
-      x: position1.left + source.offsetWidth  / 2 - this.linkDisplayLine.offsetWidth / 2,
-      y: position1.top  + source.offsetHeight / 2 - this.linkDisplayLine.offsetWidth / 2
-    };
-
-    // Calculate the destination position.
-    var destination = {
-      x: position2.left + target.offsetWidth  / 2 - this.linkDisplayLine.offsetWidth / 2,
-      y: position2.top  + target.offsetHeight / 2 - this.linkDisplayLine.offsetWidth / 2
-    };
-
-    // Position and size the line.
-    drawLine(this.linkDisplayLine, origin, destination);
-
-    // Show the line with an endpoint.
-    this.linkDisplayLine.classList.toggle('link-endpoint', !this.pane.linkedPane.linkedPane);
-
     // Recursively show child links.
-    if (recursive) this.pane.linkedPane.statusLight.showLink();
+    if (recursive && this.pane.linkedPane) {
+      this.pane.linkedPane.linkManager.showLink(recursive, transition, animateEnd);
+    }
   };
 
   /**
    * Fades out the link line added in showLink().
    *
    * @param {Boolean} [recursive=true] If true, shows links recursively.
+   * @param {Boolean} [fadeOut=true] - Whether to transition changes.
    */
-  StatusLight.prototype.hideLink = function(recursive) {
+  LinkManager.prototype.hideLink = function(recursive, fadeOut) {
+    var transition;
+
+    // Set defaults.
     if (typeof recursive === 'undefined') recursive = true;
+    if (typeof transition === 'undefined') fadeOut = true;
+
+    // Fade out the line.
+    if (!fadeOut) {
+      transition = this.containers.display.style.transition;
+      this.containers.display.style.transition = 'none';
+    }
+
+    this.containers.display.style.opacity = 0;
+
+    if (!fadeOut) this.containers.display.style.transition = transition;
 
     // Unset flag.
     this.isShowingLink = false;
 
-    // Remove the display line.
-    fadeOut(this.linkDisplayLine, 200, 'ease-in');
-
     // Recursively hide child links.
     if (recursive && this.pane.linkedPane) {
-      this.pane.linkedPane.statusLight.hideLink();
+      this.pane.linkedPane.linkManager.hideLink(recursive, fadeOut);
     }
   };
 
   /**
    * Draws a link line between the status light and the mouse position.
    *
-   * @param {MouseEvent} event - The mousemove event to handle.
+   * @param {Object} destination - The point to draw the link line to.
+   * @param {Number} destination.x - The x position of the destination.
+   * @param {Number} destination.y - The y position of the destination.
    */
-  StatusLight.prototype.drawLinkLine = function(event) {
+  LinkManager.prototype.drawLinkLine = function(destination) {
     // Get the light element's position.
-    var position = this.linkLight.getBoundingClientRect();
+    var clientRect = this.pane.statusLight.getBoundingClientRect();
 
     // Calculate the source position.
-    var originX = position.left + this.linkLight.offsetWidth  / 2 - this.linkLine.offsetWidth / 2;
-    var originY = position.top  + this.linkLight.offsetHeight / 2;
+    var origin = {
+      x: clientRect.left + clientRect.width  / 2,
+      y: clientRect.top  + clientRect.height / 2
+    };
 
-    // Calculate the destination position.
-    var mouseX = this.destinationX = event.pageX - this.linkLine.offsetWidth / 2;
-    var mouseY = this.destinationY = event.pageY;
+    // Store position info.
+    this.drawInfo.link.origin = origin;
+    this.drawInfo.link.destination = destination;
 
     // Draw the line.
-    drawLine(this.linkLine, { x: originX, y: originY }, { x: mouseX, y: mouseY });
+    drawLine(this.containers.link, origin, destination);
 
-    // Toggle the 'inlink-endpoint' class if not hovering over a valid link target.
-    // Look for a pane under the cursor and link to it.
-    var targetPane = this.pane.editor.getPaneAtCoordinate(this.destinationX, this.destinationY);
-
-    if (targetPane) {
-      this.linkLine.classList.toggle('link-endpoint', this.pane.canLinkToPane(targetPane));
-    } else {
-      this.linkLine.classList.remove('link-endpoint');
-    }
+    // Toggle the 'link-endpoint' class if hovering over a valid link target.
+    var targetPane = this.pane.editor.getPaneAtCoordinate(destination);
+    this.nodes.linkEnd.classList.toggle('link-endpoint', this.pane.canLinkToPane(targetPane));
   };
-
-  /**
-   * Adds an element to another element and fades it in from transparent.
-   * The fade will be for the given duration, and with the specified easing
-   * function. Note that the easing function must be CSS-compliant.
-   *
-   * @param {Element} parentElement - The element to add the transitioned element to.
-   * @param {Element} element - The element to fade in.
-   * @param {Number} duration - The duration, in milliseconds, of the fade.
-   * @param {String} easing - The easing function to use for the transition.
-   */
-  function fadeIn(parentElement, element, duration, easing) {
-    element.style.opacity = 0;
-    element.style.transition = 'opacity ' + duration + 'ms ' + easing;
-    
-    parentElement.appendChild(element);
-    element.offsetHeight; // Force reflow.
-    element.style.opacity = 1;
-
-    element.removeEventListener('transitionend', finishFadeOut);
-    element.addEventListener('transitionend', finishFadeIn);
-  }
-
-  /**
-   * Completes the fade-in effect started by fadeIn().
-   *
-   * @param {TransitionEvent} event - The transitionend event to handle.
-   */
-  function finishFadeIn(event) {
-    var target = event.target;
-
-    target.style.opacity = '';
-    target.style.transition = '';
-    target.removeEventListener('transitionend', finishFadeIn);
-  }
-
-  /**
-   * Fades an element out for the given duration, with the specified
-   * easing. Note that the easing function must be CSS-compliant.
-   *
-   * @param {Element} element - The element to fade out.
-   * @param {Number} duration - The duration, in milliseconds, of the fade.
-   * @param {String} easing - The easing function to use for the transition.
-   */
-  function fadeOut(element, duration, easing) {
-    element.style.opacity = 0;
-    element.style.transition = 'opacity ' + duration + 'ms ' + easing;
-
-    element.removeEventListener('transitionend', finishFadeIn);
-    element.addEventListener('transitionend', finishFadeOut);
-  }
-
-  /**
-   * Completes the fade-out effect started by fadeOut(), and removes
-   * the element.
-   *
-   * @param {TransitionEvent} event - The transitionend event to handle.
-   */
-  function finishFadeOut(event) {
-    var target = event.target;
-
-    target.style.opacity = '';
-    target.style.transition = '';
-    target.parentNode.removeChild(target);
-    target.removeEventListener('transitionend', finishFadeOut);
-  }
 
   /**
    * Resizes and rotates an element so that it stretches between the specified points.
@@ -607,14 +859,56 @@
                            (destination.y - origin.y) * (destination.y - origin.y));
 
     // Calculate the angle.
-    var angle = 180 / 3.1415 * Math.acos((destination.y - origin.y) / length);
+    var angle = length ? 180 / 3.1415 * Math.acos((destination.y - origin.y) / length) : 0;
     if (destination.x > origin.x) angle *= -1;
 
-    // Draw the line from the source to the destination.
+    // If the length is being set to zero, then don't transition angle changes.
+    var oldAngle = line.style.webkitTransform.match(/rotate\((.*?)\)/);
+    oldAngle = oldAngle ? parseFloat(oldAngle[1], 10) : angle;
+    if (length === 0 && oldAngle) angle = oldAngle;
+
+    // Cache the transition.
+    var cachedTransition = line.style.transition;
+    var cachedOpacity    = line.style.opacity;
+
+    // Get the difference between the angles.
+    var angleDifference = angle - oldAngle;
+    var smallestDifference = (angleDifference + 180) % 360 - 180;
+
+    // Make the angle transition travel through the smallest arc.
+    // This means setting the rotation to a normalized value before transitioning.
+    // Add 0.0001 to fix marginal issues with floating point numbers.
+    if (length && angleDifference > smallestDifference + 0.0001) {
+      line.style.webkitTransform = 'translate(' + origin.x + 'px, ' + origin.y + 'px)'
+        + ' ' + 'rotate(' + oldAngle % 360 + 'deg)';
+      line.style.opacity = getComputedStyle(line).opacity;
+
+      line.style.transition = 'none';
+      line.offsetHeight; // Trigger reflow.
+      line.style.transition = cachedTransition;
+      line.style.opacity    = cachedOpacity;
+
+      // Normalize the angle.
+      angle = oldAngle + smallestDifference;
+      angle = angle % 360;
+    }
+
+    // Set the line's transformation.
+    line.style.webkitTransform = 'translate(' + origin.x + 'px, ' + origin.y + 'px)'
+      + ' ' + 'rotate(' + angle + 'deg)';
+
+    // If the transformation is from zero to another position,
+    // set the tranform instantaneously (fixes silly rotation issue).
+    if (line.style.height === '0px') {
+      line.style.opacity    = getComputedStyle(line).opacity;
+      line.style.transition = 'none';
+      line.offsetHeight; // Trigger reflow.
+      line.style.transition = cachedTransition;
+      line.style.opacity    = cachedOpacity;
+    }
+
+    // Set the line height.
     line.style.height = length + 'px';
-    line.style.top    = origin.y + 'px';
-    line.style.left   = origin.x + 'px';
-    line.style.webkitTransform = 'rotate(' + angle + 'deg)';
   }
 
   /**
@@ -622,17 +916,71 @@
    *
    * @param {Pane} pane - The pane to update. Connected panes will have
    *        their links updated as well.
+   * @param {Boolean} [transition=true] - Whether to transition changes.
+   * @param {Boolean} [updateLinking=true] - Whether to update linking panes as well.
    */
-  function updateDisplayedLinks(pane) {
-    var show = pane.editor.container.classList.contains('showing-links') || pane.statusLight.isShowingLink;
+  function updateDisplayedLinks(pane, transition, updateLinking) {
+    // Exit if the link shouldn't be shown.
+    if (!pane.linkManager.isShowingLink || !pane.wrapper.classList.contains('showing-link')) return;
 
-    // Update pane.
-    if (show) pane.statusLight.showLink(false);
+    // Set defaults.
+    if (typeof updateLinking === 'undefined') updateLinking = true;
+    if (typeof transition === 'undefined') transition = true;
 
-    // Update connected panes as well.
-    _.forEach(pane.linkingPanes, function(linkingPane) {
-      if (show) linkingPane.statusLight.showLink(false);
-    });
+    // Show the link.
+    pane.linkManager.showLink(false, transition);
+
+    // Update linking panes recursively.
+    if (updateLinking) {
+      _.forEach(pane.linkingPanes, function(linkingPane) {
+        updateDisplayedLinks(linkingPane, transition, false);
+      });
+    }
+  }
+
+  /**
+   * Checks whether a point is within a circle.
+   *
+   * @param {Object} point    - The point to check.
+   * @param {Number} point.x  - The x position of the point.
+   * @param {Number} point.y  - The y position of the point.
+   * @param {Object} origin   - The origin of the circle.
+   * @param {Number} origin.x - The x position of the origin.
+   * @param {Number} origin.y - The y position of the origin.
+   * @param {Number} radius   - The radius of the circle.
+   *
+   * @return {Boolean} True if the point is within the circle.
+   */
+  function pointInCircle(point, origin, radius) {
+    var dx = point.x - origin.x;
+    var dy = point.y - origin.y;
+
+    return (dx * dx) + (dy * dy) <= (radius * radius);
+  }
+
+  /**
+   * Returns the closest point on a given circle to another point.
+   *
+   * @param {Object} point    - The point to get the nearest point to.
+   * @param {Number} point.x  - The x position of the point.
+   * @param {Number} point.y  - The y position of the point.
+   * @param {Object} origin   - The origin of the circle.
+   * @param {Number} origin.x - The x position of the origin.
+   * @param {Number} origin.y - The y position of the origin.
+   * @param {Number} radius   - The radius of the circle.
+   *
+   * @return {Object} The nearest point lying on the circle.
+   */
+  function getClosestCirclePoint(point, origin, radius) {
+    var p = {};
+    var dx = point.x - origin.x;
+    var dy = point.y - origin.y;
+    var length = Math.sqrt(dx*dx + dy*dy);
+
+    p.x = origin.x + (radius * dx / length);
+    p.y = origin.y + (radius * dy / length);
+
+    return p;
   }
 
 /* =======================================================
@@ -661,73 +1009,21 @@
    */
   function Pane(editor, buffer, wrapper, type) {
     var _this = this;
+    var anchor;
 
     // Mix in event handling.
-    Observable(this);
+    Observable.mixin(this);
 
     // Defaults.
-    buffer  = buffer  || new Buffer();
-    wrapper = wrapper || document.createElement('div');
-    type    = type    || 'base';
+    this.wrapper = wrapper || document.createElement('div');
+    this.type    = type    || 'base';
 
     // Keep a reference to the editor.
     this.editor = editor;
 
-    // Set type.
-    this.type = type;
-
-    // Define an object to hold focus triggers.
+    // Register focus and blur handlers for the pane.
     this.focuses = {};
-
-    // Save reference to wrapper.
-    this.wrapper = wrapper;
-    this.wrapper.className = 'pane ' + type;
-    this.wrapper.setAttribute('tabIndex', 0);
-
-    // Create the title bar.
-    this.titleBar = document.createElement('div');
-    this.titleBar.className = 'title-bar';
-
-    // Add a title to the title bar.
-    this.titleElement = document.createElement('span');
-    this.titleElement.className = 'title';
-    this.titleBar.appendChild(this.titleElement);
-
-    // Add a status light to the title bar.
-    this.statusLight = new StatusLight(this);
-
-    // Add the anchor icon.
-    var anchor = document.createElement('div');
-    anchor.className = 'anchor';
-    this.titleBar.appendChild(anchor);
-
-    // Add the title bar to the wrapper.
-    this.wrapper.appendChild(this.titleBar);
-
-    // Add the command bar.
-    this.commandBar = new CommandBar(this);
-
-    // Toggle the command bar with ESC. Opens it if it's closed,
-    // focuses it if it's unfocused, and runs the commands otherwise.
-    this.wrapper.addEventListener('keydown', function(event) {
-      // Only proceed on ESC keypress.
-      if (event.keyCode !== 27) return;
-      event.stopPropagation();
-
-      if (!_this.commandBar.isOpen) {
-        _this.commandBar.toggle();
-      } else {
-        if (!_this.focuses['commandBarFocus']) {
-          _this.commandBar.focus();
-        } else {
-          _this.commandBar.runCommands();
-          _this.commandBar.toggle();
-        }
-      }
-    });
-
-    // Set the buffer.
-    this.switchBuffer(buffer);
+    this.registerFocusHandlers();
 
     // The pane shouldn't be anchored by default.
     this.isAnchored = false;
@@ -735,12 +1031,56 @@
     // Keep an array of all panes linked to this one.
     this.linkingPanes = [];
 
-    // Register focus and blur handlers for the pane.
-    this.registerFocusHandlers();
+    // Save reference to wrapper.
+    this.wrapper = wrapper;
+    this.wrapper.className = 'pane ' + type;
+    this.wrapper.setAttribute('tabIndex', 0);
 
-    // Track resize events.
+    // Create the overlay.
+    this.overlayElement = document.createElement('div');
+    this.overlayElement.className = 'pane-overlay';
+    this.wrapper.appendChild(this.overlayElement);
+
+    // Create titlebar elements.
+    this.titleBar     = document.createElement('div');
+    this.titleElement = document.createElement('span');
+    this.linkBar      = document.createElement('div');
+    this.linkButton   = document.createElement('div');
+    this.statusLight  = document.createElement('div');
+    anchor = document.createElement('div');
+
+    // Set class names.
+    this.titleBar.className     = 'title-bar';
+    this.titleElement.className = 'title';
+    this.linkBar.className      = 'link-bar';
+    this.linkButton.className   = 'link-button';
+    this.statusLight.className    = 'status-light';
+    anchor.className = 'anchor';
+
+    // Add them all to the DOM.
+    this.titleBar.appendChild(this.titleElement);
+    this.titleBar.appendChild(this.linkBar);
+    this.titleBar.appendChild(anchor);
+    this.linkBar.appendChild(this.linkButton);
+    this.linkBar.appendChild(this.statusLight);
+    this.wrapper.appendChild(this.titleBar);
+
+    // Switch to the buffer.
+    this.switchBuffer(buffer || new Buffer());
+
+    // Add the command bar and link manager.
+    this.commandBar  = new CommandBar(this);
+    this.linkManager = new LinkManager(this);
+
+    // Track resize events on the window.
     window.addEventListener('resize', function() {
       _this.trigger('resize');
+    });
+
+    // Remove links if the pane is removed.
+    this.on('remove.start', function() {
+      if (_this.linkingPanes) _this.unlinkAllPanes(true);
+      _this.linkToPane(false, true);
     });
 
     // Run any post-initialization.
@@ -830,9 +1170,6 @@
   Pane.prototype.switchBuffer = function(buffer, breakLink) {
     var _this = this;
 
-    // Safety check.
-    if (!buffer) return;
-
     // Break the link if requested.
     if (breakLink && this.linkedPane) this.linkToPane(false);
 
@@ -841,29 +1178,23 @@
 
     // Set the new buffer.
     this.buffer = buffer;
-    this.trigger('changeBuffer', [buffer]);
-    this.trigger('change');
+    this.trigger('change.buffer', buffer);
+    this.trigger('change.content');
 
     this.titleElement.textContent = buffer.title;
 
-    // Stop tracking the old buffer's title changes.
-    if (typeof this.titleChangeID !== 'undefined') {
-      oldBuffer.off(this.titleChangeID);
-    }
-
-    // Stop tracking the old buffer's content changes.
-    if (typeof this.contentChangeID !== 'undefined') {
-      oldBuffer.off(this.contentChangeID);
-    }
+    // Stop tracking the old buffer's changes.
+    if (oldBuffer) oldBuffer.off(this.titleChangeID);
+    if (oldBuffer) oldBuffer.off(this.contentChangeID);
 
     // Track the new buffer's title changes.
-    this.titleChangeID = buffer.on('changeFilepath', function(filepath, title) {
+    this.titleChangeID = buffer.on('change.filepath', function(filepath, title) {
       _this.titleElement.textContent = title;
     });
 
     // Track the new buffer's content changes.
-    this.titleChangeID = buffer.on('change', function() {
-      _this.trigger('change');
+    this.contentChangeID = buffer.on('change.content', function() {
+      _this.trigger('change.content');
     });
 
     // Add the new buffer to the buffer list.
@@ -879,10 +1210,16 @@
    * This means that both panes will share their contents, even if one of them switches
    * to a different buffer.
    *
-   * @param {Pane|False} pane - The pane to link to. Passing a falsey value will remove all links.
+   * @param {Pane|Falsey} pane - The pane to link to. Passing a falsey value will remove all links.
+   * @param {Boolean} [keepBuffer=false] - Whether to keep the current buffer in the pane, assuming
+   *                                       that the pane parameter recieved a falsey argument.
    * @return {Boolean} False if a circular reference would be created, otherwise true.
    */
-  Pane.prototype.linkToPane = function(pane) {
+  Pane.prototype.linkToPane = function(pane, keepBuffer) {
+    var oldPane = this.linkedPane;
+    var _this = this;
+    pane = pane || false;
+
     // Return early if the pane link is disallowed.
     if (pane && !this.canLinkToPane(pane)) return false;
 
@@ -901,8 +1238,7 @@
       this.switchBuffer(pane.buffer);
 
       // Add event handlers for the new linked pane.
-      var _this = this;
-      this.linkID = pane.on('changeBuffer', function(newBuffer) {
+      this.linkID = pane.on('change.buffer', function(newBuffer) {
         _this.switchBuffer(newBuffer);
       });
 
@@ -913,7 +1249,7 @@
       this.isAnchored = false;
 
       // Switch to a new buffer.
-      this.switchBuffer(new Buffer());
+      if (!keepBuffer) this.switchBuffer(new Buffer());
     }
 
     // Toggle the link based on whether the pane exists.
@@ -921,6 +1257,9 @@
 
     // Set the new link pane.
     this.linkedPane = pane;
+
+    // Trigger a link event.
+    this.trigger('link', [pane, oldPane]);
 
     return true;
   };
@@ -939,7 +1278,7 @@
     // Only link to panes or subclasses.
     if (pane instanceof Pane === false) return false;
 
-    // Prevent linking to self or the same pane.
+    // Prevent linking to itself or the same same pane.
     if (pane === this || pane === this.linkedPane) return false;
 
     // Prevent circular links.
@@ -954,10 +1293,14 @@
 
   /**
    * Unlinks all panes linked to this one.
+   *
+   * @param {Boolean} [keepBuffer=false] - Whether the linking panes' buffers
+   *                                       should be kept when unlinking.
    */
-  Pane.prototype.unlinkAllPanes = function() {
-    _.forEach(this.linkingPanes, function(pane) {
-      pane.linkToPane(false);
+  Pane.prototype.unlinkAllPanes = function(keepBuffer) {
+    // Iterates over a copy, since the collection gets modified.
+    _.forEach(this.linkingPanes.slice(), function(pane) {
+      pane.linkToPane(false, keepBuffer);
     });
   };
 
@@ -965,18 +1308,28 @@
    * Tracks the given pane as being linked to this one.
    *
    * @param {Pane} pane - The pane to track.
+   * @return {Boolean} True, if successful.
    */
   Pane.prototype.addLinkingPane = function(pane) {
+    var index = this.linkingPanes.indexOf(pane);
+    if (index !== -1) return false;
+
     this.linkingPanes.push(pane);
+    return true;
   };
 
   /**
    * Stops tracking the given pane as being linked to this one.
    *
    * @param {Pane} pane - The pane to stop tracking.
+   * @return {Boolean} True, if successful.
    */
   Pane.prototype.removeLinkingPane = function(pane) {
-    this.linkingPanes.splice(this.linkingPanes.indexOf(this), 1);
+    var index = this.linkingPanes.indexOf(pane);
+    if (index === -1) return false;
+    
+    this.linkingPanes.splice(index, 1);
+    return true;
   };
 
   /**
@@ -989,6 +1342,7 @@
     var parentElement = this.wrapper.parentElement;
     return parentElement.classList.contains('vertical-splitter-pane') ? parentElement : this.wrapper;
   };
+
 
 /* =======================================================
  *                       InputPane
@@ -1083,12 +1437,10 @@
     this.cm.refresh();
 
     // Remove old event listeners.
-    if (typeof this.filetypeChangeID !== 'undefined') {
-      this.buffer.off(this.filetypeChangeID);
-    }
+    if (this.buffer) this.buffer.off(this.filetypeChangeID);
     
     // Listen for filepath changes on the new buffer.
-    this.filetypeChangeID = buffer.on('changeFilepath', function(filepath, title) {
+    this.filetypeChangeID = buffer.on('change.filepath', function(filepath, title) {
       _this.setMode(detectMode(filepath, prefKeys.subKeys.inputMode));
     });
 
@@ -1173,24 +1525,22 @@
   PreviewPane.prototype.switchBuffer = function(buffer, breakLink) {
     var _this = this;
 
-    // Remove old event listeners.
-    if (typeof this.filetypeChangeID !== 'undefined') {
-      this.buffer.off(this.filetypeChangeID);
-    }
+    // Stop tracking the old buffer's changes.
+    if (this.buffer) this.buffer.off(this.filetypeChangeID);
+    if (this.buffer) this.buffer.off(this.changeID);
     
     // Listen for filepath changes on the new buffer.
-    this.filetypeChangeID = buffer.on('changeFilepath', function(filepath, title) {
+    this.filetypeChangeID = buffer.on('change.filepath', function(filepath, title) {
       _this.parse = PreviewPane.getMode(detectMode(filepath, prefKeys.subKeys.previewMode));
     });
 
-    // Detect and set a mode.
+    // Listen for content changes on the new buffer.
+    this.changeID = buffer.on('change.content', function() { _this.preview(buffer); });
+
+    // Detect and set the parsing mode.
     this.parse = PreviewPane.getMode(detectMode(buffer.filepath, prefKeys.subKeys.previewMode));
 
-    if (typeof this.changeID !== 'undefined') {
-      this.buffer.off(this.changeID);
-    }
-
-    this.changeID = buffer.on('change', this.preview.bind(this));
+    // Preview the buffer.
     this.preview(buffer);
 
     return Pane.prototype.switchBuffer.call(this, buffer, breakLink);
@@ -1214,17 +1564,11 @@
    *
    * The Editor class is responsible for managing Pane objects and presenting
    * a display to the user. It also has methods for running user-defineable commands
-   * that can extend functionality further.
-   *
-   * @todo After creating a key combination class, move the show/hide links
-   *       functionality over to it.
-   * @todo Use a better key than CTRL. Right now it conflicts badly with other
-   *       common key combinations. (Though using a timeout does help.)
+   * that can further extend functionality.
    *
    * @constructor
-   * @param {String} containerID - The id of the element to insert the editor into.
    */
-  function Editor(containerID) {
+  function Editor() {
     var _this = this;
     var timeout = null;
 
@@ -1232,51 +1576,17 @@
     this.container = document.getElementById('editor');
     this.panes = [];
     this.bufferList = new BufferList();
+    this.isManagingLinks = false;
 
     // Command-related properties.
     this.commandDictionary = {};
     this.commandHistory = [];
+    this.commandChain = Q();
 
     // For holding link lines.
-    this.linkLineContainer = document.createElement('div');
-    this.linkLineContainer.className = 'link-line-container';
-    document.body.appendChild(this.linkLineContainer);
-
-    // On CTRL press, show all pane links.
-    this.container.addEventListener('keydown', function(event) {
-      // Only proceed on CTRL keypress.
-      if (event.keyCode !== 17) return;
-
-      // Execute the function after a timeout.
-      timeout = setTimeout(function() {
-        // Add a class to display state.
-        _this.container.classList.add('showing-links');
-
-        // Show all links.
-        _.forEach(_this.panes, function(pane) {
-          pane.statusLight.showLink(false);
-        });
-      }, 500);
-    });
-
-    // On CTRL release, hide all links again.
-    this.container.addEventListener('keyup', function(event) {
-      // Only proceed on CTRL keypress.
-      if (event.keyCode !== 17) return;
-
-      if (timeout) {
-        // Clear the timeout.
-        clearTimeout(timeout);
-
-        // Remove the class.
-        _this.container.classList.remove('showing-links');
-
-        // Hide all links.
-        _.forEach(_this.panes, function(pane) {
-          pane.statusLight.hideLink(false);
-        });
-      }
-    });
+    this.linkContainer = document.createElement('div');
+    this.linkContainer.className = 'link-line-wrapper';
+    document.body.appendChild(this.linkContainer);
 
     return this;
   }
@@ -1294,9 +1604,11 @@
 
   /**
    * Adds a new pane. If the type is set to 'vertical', then the pane will be
-   * inserted into the same vertical compartment as parentPane. If parentPane
-   * is specified, then the new pane will be immediately adjacent to it, or
-   * will otherwise be appended to the editor container.
+   * inserted into the same vertical compartment as parentPane.
+   *
+   * For a horizontal split, if parentPane is specified then the new
+   * pane will be immediately adjacent to it. If not, it will be appended
+   * to the editor container.
    *
    * Note that the editor parameter can be omitted from the arguments to pass to
    * the pane constructor, or can be stated explictly.
@@ -1318,6 +1630,7 @@
    * @return {Pane} The newly added pane.
    */
   Editor.prototype.addPane = function(constructor, args, type, parentPane, isInstant) {
+    var _this     = this;
     var container = this.container;
     var pane, factoryFunction, wrapper, focusPane, outerWrapper;
 
@@ -1388,27 +1701,45 @@
     // Add the pane to the pane list.
     this.panes.push(pane);
 
-    // Transition in the pane. 
+    // Trigger the in-progress add event.
+    pane.trigger('add.start');
+
+    // Add a class.
+    wrapper.classList.add('opening');
+
+    // Add the pane without a transition. 
     if (!isInstant) {
-      wrapper.classList.add('opening');
+      wrapper.classList.add('instant-open');
       wrapper.offsetHeight; // Trigger reflow.
-      wrapper.classList.remove('opening');
+      wrapper.classList.remove('instant-open');
+    }
+
+    // Show the pane's link.
+    if (this.isManagingLinks) {
+      pane.linkManager.showLink(false);
+      pane.wrapper.classList.add('showing-link');
     }
 
     // Size the panes appropriately.
-    sizePanesEvenly(this, container, type, isInstant);
+    sizePanesEvenly(this, container, type, isInstant, null, function() {
+      // Vertical splits cause display issues.
+      if (type === 'vertical') {
+        _.forEach(_this.panes, function(pane) {
+          if (pane instanceof InputPane) {
+            pane.cm.refresh();
+          }
+        });
+      }
 
-    // Vertical splits cause display issues.
-    if (type === 'vertical') {
-      _.forEach(this.panes, function(pane) {
-        if (pane instanceof InputPane) {
-          pane.cm.refresh();
-        }
-      });
-    }
+      // Refocus the focus pane.
+      if (focusPane) focusPane.focus();
 
-    // Refocus the focus pane.
-    if (focusPane) focusPane.focus();
+      // Remove the opening class.
+      wrapper.classList.remove('opening');
+
+      // Trigger the pane's added event.
+      pane.trigger('add.end');
+    });
 
     return pane;
   };
@@ -1425,7 +1756,7 @@
     var containerParent  = container.parentElement;
     var containerSibling = container.previousElementSibling || container.nextElementSibling;
     var shouldRefocus    = this.hasFocusedPane() ? pane === this.getFocusPane() : false;
-    var wrapper, splitter, parentElement, direction, newFocus;
+    var wrapper, splitter, parentElement, direction, newFocus, interval;
 
     // Separate cases are needed for cases including vertical splitters.
     // For example, removing the last pane in a vertical split should also remove the split.
@@ -1457,16 +1788,36 @@
 
     // Clean up pane references.
     this.panes.splice(this.panes.indexOf(pane), 1);
-    if (pane.linkingPanes) pane.unlinkAllPanes();
+
+    // Fix the pane content's size (prevents visual noise when transitioning out).
+    var computedStyle = getComputedStyle(wrapper.firstChild);
+    wrapper.firstChild.style.transition  = 'none';
+    wrapper.firstChild.style.marginLeft  = computedStyle.marginLeft;
+    wrapper.firstChild.style.width       = computedStyle.width;
+    wrapper.firstChild.style.height      = computedStyle.height;
+    wrapper.firstChild.offsetHeight; // Trigger reflow.
+
+    // Trigger the in-progress remove event.
+    pane.trigger('remove.start');
 
     // Transition out the panes.
     wrapper.classList.add('closing');
     splitter.classList.add('closing');
 
+    // Trigger resize events on an interval.
+    interval = setInterval(function() {
+      pane.trigger('resize');
+    }, 10);
+
     // Remove the pane and resize the remaining panes.
     sizePanesEvenly(this, parentElement, direction, false, wrapper, function() {
       parentElement.removeChild(splitter);
       parentElement.removeChild(wrapper);
+      clearInterval(interval);
+
+      // Trigger the pane's removed event.
+      pane.trigger('remove.end');
+
       callback();
     });
 
@@ -1702,6 +2053,33 @@
   };
 
   /**
+   * Starts link management mode.
+   */
+  Editor.prototype.manageLinks = function() {
+    _.forEach(this.panes, function(pane) {
+      pane.linkManager.showLink(false, true, false);
+      pane.wrapper.classList.add('showing-link');
+    });
+
+    this.isManagingLinks = true;
+    this.container.classList.add('managing-links');
+  };
+
+  /**
+   * Ends link management mode.
+   */
+  Editor.prototype.endManageLinks = function() {
+    _.forEach(this.panes, function(pane) {
+      pane.linkManager.hideLink(false);
+      pane.wrapper.classList.remove('showing-link');
+    });
+
+    this.isManagingLinks = false;
+    this.container.classList.remove('managing-links');
+  };
+
+
+  /**
    * Checks for the presence of a focused pane.
    *
    * @return {Boolean} Whether the editor has a focused pane.
@@ -1735,12 +2113,13 @@
   /**
    * Returns the pane at the given screen position.
    *
-   * @param {Number} x - The horizontal position to check.
-   * @param {Number} y - The vertical position to check.
+   * @param {Object} point - The position to check for a pane.
+   * @param {Number} point.x - The horizontal position to check.
+   * @param {Number} point.y - The vertical position to check.
    * @return {Pane|False} The pane at the given position, or false if none exists.
    */
-  Editor.prototype.getPaneAtCoordinate = function(x, y) {
-    var target = document.elementFromPoint(x, y);
+  Editor.prototype.getPaneAtCoordinate = function(point) {
+    var target = document.elementFromPoint(point.x, point.y);
     var paneElement = ancestorWithClass(target, 'pane');
 
     return paneElement ? this.getPaneByElement(paneElement) : false;
@@ -1857,12 +2236,17 @@
    * Run the specified command or array of commands. Commands can be passed in as
    * either a string to be parsed (as from the command bar) or as an array of such strings.
    *
-   * Note that if one of the commands fail, any following commands will be skipped.
-   * After running a command there should generally be a focused pane.
+   * A command will not be executed until all previous commands have cleared (this includes calling
+   * runCommand() multiple times -- the commands will be queued until previous ones have finished).
+   * The promise returned from this function is for only the commands specified in a particular call,
+   * not for the entire queue.
+   *
+   * Note that if one of the commands fail, any following commands will be skipped. The queue will
+   * not be terminated, and will continue with the next batch of commands.
    *
    * @param {String|String[]} list - A command string to parse, or an array of command strings.
    * @param {Pane} pane - The pane to run the commands on.
-   * @return {Promise} A promise chain for all the commands.
+   * @return {Promise} A promise chain for the specified commands.
    */
   Editor.prototype.runCommand = function(list, pane) {
     var deferred = Q.defer();
@@ -1874,8 +2258,9 @@
       return deferred.promise;
     }
 
-    // Get command definitions.
+    // Get command and history definitions.
     var dictionary = this.commandDictionary;
+    var history    = this.commandHistory;
 
     // Parse out an array of commands from the list.
     var commands = _([].concat(list))
@@ -1883,62 +2268,38 @@
       .sortBy(function(results) { return results.command.forceLast ? 1 : 0; })
       .value();
 
-    // Create an item to track command results.
-    var historyItem = { time: new Date(), count: commands.length };
+    // Reset the command chain if it's done executing.
+    if (!this.commandChain.isPending()) this.commandChain = Q();
 
-    // Setting this to true within the _.reduce() call will skip remaining commands.
-    var failHard = false;
+    // Execute this command after all other commands are done.
+    this.commandChain = this.commandChain.then(function() {
+      // Create an item to track command results.
+      var historyItem = {
+        time: new Date(),
+        input: list.trim(),
+        count: commands.length
+      };
 
-    // Save a record of the commands.
-    this.commandHistory.push(historyItem);
+      // Setting this to true within the _.reduce() call will skip remaining commands.
+      var failHard = false;
 
-    // Run through the commands in order, waiting for any returned promises
-    // to resolve before continuing.
-    var promise = _.reduce(commands, function(promiseChain, commandInfo, index) {
-      return Q.when(promiseChain, function() {
-        // Assign in here so that the pane can be changed between commands.
-        var command = commandInfo.command;
-        var args = [pane].concat(commandInfo.args);
+      // Save a record of the commands.
+      history.push(historyItem);
 
-        // Build a history item to track the command.
-        historyItem[index] = {
-          name: command.name,
-          result: 'Succeeded',
-          targetPane: pane
-        };
-
-        // There was an error: skip remaining commands.
-        if (failHard) throw new Error();
-
-        // Execute the command.
-        return Q.when(command.func.apply(null, args), function() {
-          var newPane;
-
-          // Re-assign the appropriate pane.
-          if (typeof command.focusFunc === 'function') {
-            newPane = command.focusFunc(_this);
-
-            // Only set the new pane if it's actually a pane.
-            if (newPane instanceof Pane) {
-              pane = newPane;
-              historyItem[index].newTargetPane = pane;
-            }
-          }
-
-          // Focus the pane.
-          pane.focus();
-        });
-      })
-      .fail(function(error) {
+      /**
+       * Records the reason for a command's failure and sets
+       * the failHard flag to true.
+       */
+      function handleError(command, index, error) {
         // Record the reason for the command failure.
         if (command.func === failCommand) {
-          historyItem[index].result = 'Unrecognized';
+          historyItem[index].status = 'Unrecognized';
         }
         else if (failHard) {
-          historyItem[index].result = 'Skipped';
+          historyItem[index].status = 'Skipped';
         }
         else {
-          historyItem[index].result = 'Failed: ' + error.message;
+          historyItem[index].status = 'Failed: ' + error.message;
         }
 
         // If the command was unrecognized or failed outright, log it.
@@ -1949,11 +2310,66 @@
 
         // Skip remaining commands.
         failHard = true;
-      });
-    }, null);
+      }
 
-    // Resolve the promise and return.
-    deferred.resolve(promise);
+      // Run through the commands in order, waiting for any returned promises
+      // to resolve before continuing.
+      var promise = _.reduce(commands, function(promiseChain, commandInfo, index) {
+
+        // Bind the command context to the error handler.
+        var errorHandler = handleError.bind(null, commandInfo.command, index);
+
+        // Execute the command.
+        return Q.when(promiseChain, function() {
+          // Assign in here so that the pane can be changed between commands.
+          var command = commandInfo.command;
+          var args = [pane].concat(commandInfo.args);
+          var commandString = command.name;
+
+          if (args.length > 1) commandString += ' ' + commandInfo.args.join(command.delimeter);
+
+          // Build a history item to track the command.
+          historyItem[index] = {
+            name: command.name,
+            args: commandInfo.args.slice(),
+            command: commandString,
+            status: 'Pending',
+            targetPane: pane
+          };
+
+          // There was an error: skip remaining commands.
+          if (failHard) throw new Error();
+
+          // Execute the command.
+          return Q.when(command.func.apply(null, args), function() {
+            var newPane, shouldFocus;
+
+            // Re-assign the appropriate pane.
+            if (typeof command.focusFunc === 'function') {
+              newPane = command.focusFunc(_this);
+
+              // Only set the new pane if it's actually a pane.
+              if (newPane instanceof Pane && newPane !== pane) {
+                pane = newPane;
+                historyItem[index].newTargetPane = pane;
+                pane.focus();
+              }
+            }
+          });
+        })
+        .then(function() {
+          historyItem[index].status = 'Succeeded';
+        })
+        .fail(errorHandler);
+      }, null);
+
+      // Resolve the deferred promise.
+      deferred.resolve(promise);
+
+      // Return the promise.
+      return promise;
+    });
+
     return deferred.promise;
   };
 
@@ -2144,7 +2560,7 @@
         // Parse out the arguments.
         index = input.indexOf(' ');
         input = index !== -1 ? input.substr(index + 1) : '';
-        args  = input.split(command.delimeter);
+        args  = _.compact(input.split(command.delimeter));
 
         // If arguments are requested, add the remainder of the command
         // string to the final argument. If argCount < 0 then unlimited
@@ -2242,18 +2658,42 @@
 
     // Set focus trigger.
     element.addEventListener('focus', function() {
-      pane.setFocus('commandBarFocus', true);
+      _this.focus();
     });
 
     // Close on blur if no content has been entered.
     element.addEventListener('blur', function() {
       if (!_this.hasText()) _this.close();
-      else pane.setFocus('commandBarFocus', false);
+      else _this.blur();
+    });
+
+    // Toggle the command bar with ESC.
+    pane.wrapper.addEventListener('keydown', function(event) {
+      if (event.keyCode !== 27 || !pane.isFocused || pane.linkManager.isLinking) return;
+      event.stopPropagation();
+
+      /**
+       * Events proceed in this order:
+       * 1) If unopened, open the bar.
+       * 2) If opened and unfocused, focus the bar.
+       * 3) If opened and focused, run commands and close.
+       */
+
+      if (!_this.isOpen) {
+        _this.open();
+      }
+      else if (!pane.focuses['commandBarFocus']) {
+        _this.focus();
+      }
+      else {
+        _this.runCommands();
+        _this.close();
+      }
     });
 
     // Keep references.
-    this.pane       = pane;
-    this.element    = element;
+    this.pane    = pane;
+    this.element = element;
 
     return this;
   }
@@ -2268,27 +2708,20 @@
 
     // Add the command bar element.
     this.pane.wrapper.appendChild(this.element);
-    this.element.focus();
-
-    // Keep the focus on the pane.
-    this.pane.setFocus('commandBarFocus', true);
+    this.focus();
   };
 
   /**
    * Removes the command bar.
    */
   CommandBar.prototype.close = function() {
-    var isFocused;
-
     // Exit if already closed.
     if (!this.isOpen) return;
     this.isOpen = false;
 
     // Close the command bar and refocus the pane if needed.
-    isFocused = this.pane.isFocused;
     this.pane.wrapper.removeChild(this.element);
-    this.pane.setFocus('commandBarFocus', false);
-    if (isFocused) this.pane.focus();
+    this.blur();
   };
 
   /**
@@ -2312,6 +2745,9 @@
     // Focus the bar.
     this.element.focus();
 
+    // Keep the focus on the pane.
+    this.pane.setFocus('commandBarFocus', true);
+
     // Moves the cursor to the end of the input.
     range = document.createRange();
     range.selectNodeContents(this.element);
@@ -2319,6 +2755,15 @@
     selection = window.getSelection();
     selection.removeAllRanges();
     selection.addRange(range);
+  };
+
+  /**
+   * Blurs the command bar and returns focus to the pane.
+   */
+  CommandBar.prototype.blur = function() {
+    var isFocused = this.pane.isFocused;
+    this.pane.setFocus('commandBarFocus', false);
+    if (isFocused) this.pane.focus();
   };
 
   /**
@@ -2352,7 +2797,7 @@
 
   // Preference keys.
   var prefKeys = {
-    root:     'extensions.editor',
+    root:      'extensions.editor',
     filetypes: 'extensions.editor.filetypes',
     subKeys: {
       inputMode:   'inputmode',

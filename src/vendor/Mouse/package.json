@@ -1,0 +1,24 @@
+{
+  "name": "mouse",
+  "version": "0.0.1",
+  "description": "A high quality library that treats the mouse as a first class object citizen",
+  "main": "Mouse.js",
+  "directories": {
+    "example": "example"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/Benvie/Mouse.git"
+  },
+  "keywords": [
+    "mouse",
+    "mousebind",
+    "bind",
+    "events",
+    "input",
+    "buttons",
+    "mice"
+  ],
+  "author": "Brandon Benvie",
+  "license": "MIT"
+}
