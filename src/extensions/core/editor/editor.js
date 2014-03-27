@@ -1384,6 +1384,21 @@
   }
 
   /**
+   * Override Pane.postInitialize.
+   */
+  InputPane.prototype.postInitialize = function() {
+    var _this = this;
+
+    // Make sure that the CodeMirror instance is refreshed upon resize.
+    this.on('resize', _.debounce(function() { _this.cm.refresh(); }, 100, {
+      leading: true,
+      trailing: true
+    }));
+
+    Pane.prototype.postInitialize.call(this);
+  }
+
+  /**
    * Sets the editor's mode.
    *
    * For a description of valid values for the mode parameter,
