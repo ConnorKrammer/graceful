@@ -7,3 +7,7 @@
   border-radius: 2px;
   font-family: "Open Sans";
 }
+
+.vex.vex-theme-os .vex-content h1 {
+  font-size: 30px;
+ }

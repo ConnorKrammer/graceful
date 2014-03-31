@@ -2,7 +2,7 @@
  * graceful-dialog
  *
  * Defines the Dialog namespace, responsible for creating user
- * prompts and notifications. Wraps the Vex library.
+ * prompts and notifications. Wraps the Vex library, and extends it slightly.
  *
  * Requires: none
  */
@@ -36,6 +36,10 @@
    * @param {String|Object} options - An options object, or a string to display to the user.
    */
   Dialog.alert = function(options) {
+    if (options.title) {
+      options.message = '<h1>' + options.title + '</h1>' + options.message;
+    }
+
     vex.dialog.alert(options);
   };
 
@@ -45,6 +49,10 @@
    * @param {Object} options - An options object.
    */
   Dialog.prompt = function(options) {
+    if (options.title) {
+      options.message = '<h1>' + options.title + '</h1>' + options.message;
+    }
+
     vex.dialog.prompt(options);
   };
 
@@ -54,6 +62,10 @@
    * @param {Object} options - An options object.
    */
   Dialog.confirm = function(options) {
+    if (options.title) {
+      options.message = '<h1>' + options.title + '</h1>' + options.message;
+    }
+
     vex.dialog.confirm(options);
   };
 
