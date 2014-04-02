@@ -74,7 +74,7 @@
 
 /* Transition the editor's position when toggling the minimap. */
 .CodeMirror {
-  transition-property: transform;
+  transition-property: -webkit-transform;
   transition-timing-function: ease;
   transition-duration: 0.5s;
 }

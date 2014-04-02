@@ -454,7 +454,7 @@ body {
 
 /* Creates a bouncing effect for the ring around the line's end node. */
 @-webkit-keyframes bounceOutline {
-  0%   { box-shadow: 0 0 0 0px rgb(250, 250, 250), 0 0 0 2px rgb(0, 173, 255); , 5)}
+  0%   { box-shadow: 0 0 0 0px rgb(250, 250, 250), 0 0 0 2px rgb(0, 173, 255); }
   100% { box-shadow: 0 0 0 3px rgb(250, 250, 250), 0 0 0 5px rgb(0, 173, 255); }
 }
 
