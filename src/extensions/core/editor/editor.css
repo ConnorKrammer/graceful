@@ -66,6 +66,7 @@ body {
   border-width: 0;
   border-style: solid;
   border-color: transparent;
+  background: rgb(250, 250, 250);
   -webkit-user-select: none;
 }
 
