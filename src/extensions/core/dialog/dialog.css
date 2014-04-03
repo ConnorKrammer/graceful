@@ -2,12 +2,45 @@
  * Extends the rules for vex's os theme.
  */
 
+.vex {
+  -webkit-user-select: none;
+}
+
+.vex.vex-theme-os .vex-overlay {
+  background: rgba(255, 255, 255, 0.95);
+}
+
 .vex.vex-theme-os .vex-content {
-  border-top-color: #333;
+  padding: 2em 2em 1.5em 2em;
+  border: none;
   border-radius: 2px;
+  box-shadow: 0 0 20px 0 rgba(0,0,0,0.2);
+  color: #fff;
   font-family: "Open Sans";
+  background: #333;
 }
 
 .vex.vex-theme-os .vex-content h1 {
   font-size: 30px;
- }
+}
+
+.vex.vex-theme-os .vex-dialog-button {
+ padding: 0.9em 2em;
+}
+
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input textarea,
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="date"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="datetime"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="datetime-local"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="email"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="month"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="number"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="password"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="search"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="tel"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="text"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="time"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="url"],
+.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="week"] {
+  background: rgb(224, 224, 224);
+}
