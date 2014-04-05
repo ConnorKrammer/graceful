@@ -1,46 +1,240 @@
-/**
- * Extends the rules for vex's os theme.
- */
+/* Note: Some of this code was repurposed from the Vex's OS theme. The design was not. */
 
+/* =======================================================
+ *                  Main Card and Overlay
+ * ======================================================= */
 .vex {
   -webkit-user-select: none;
 }
 
-.vex.vex-theme-os .vex-overlay {
+.vex.vex-theme-graceful {
+  padding-top: 160px;
+  padding-bottom: 160px;
+}
+
+.vex.vex-theme-graceful .vex-close {
+  border-radius: 0 5px 0 0;
+  position: absolute;
+  top: 0;
+  right: 0;
+  cursor: pointer;
+}
+
+.vex.vex-theme-graceful .vex-close:before {
+  border-radius: 3px;
+  position: absolute;
+  content: "\00D7";
+  font-size: 26px;
+  font-weight: normal;
+  line-height: 31px;
+  height: 30px;
+  width: 30px;
+  text-align: center;
+  top: 3px;
+  right: 3px;
+  color: #bbbbbb;
+  background: transparent;
+}
+
+.vex.vex-theme-graceful .vex-close:hover:before,
+.vex.vex-theme-graceful .vex-close:active:before {
+  color: #777777;
+  background: #e0e0e0;
+}
+
+.vex.vex-theme-graceful .vex-overlay {
   background: rgba(255, 255, 255, 0.95);
 }
 
-.vex.vex-theme-os .vex-content {
+/* =======================================================
+ *                        Content
+ * ======================================================= */
+.vex.vex-theme-graceful .vex-content {
+  position: relative;
+  width: 450px;
+  max-width: 100%;
+  margin: 0 auto;
   padding: 2em 2em 1.5em 2em;
   border: none;
   border-radius: 2px;
-  box-shadow: 0 0 20px 0 rgba(0,0,0,0.2);
-  color: #fff;
   font-family: "Open Sans";
+  font-size: 1.1em;
+  line-height: 1.5em;
+  color: #fff;
   background: #333;
+  box-shadow: 0 0 15px 0 rgba(0, 0, 0, 0.15);
 }
 
-.vex.vex-theme-os .vex-content h1 {
+.vex.vex-theme-graceful.vex-closing .vex-content {
+  -webkit-animation: vex-flyout 0.5s;
+  -webkit-backface-visibility: hidden;
+}
+
+.vex.vex-theme-graceful .vex-content {
+  -webkit-animation: vex-flyin 0.5s;
+  -webkit-backface-visibility: hidden;
+}
+
+.vex.vex-theme-graceful .vex-content h1,
+.vex.vex-theme-graceful .vex-content h2,
+.vex.vex-theme-graceful .vex-content h3,
+.vex.vex-theme-graceful .vex-content h4,
+.vex.vex-theme-graceful .vex-content h5,
+.vex.vex-theme-graceful .vex-content h6,
+.vex.vex-theme-graceful .vex-content p,
+.vex.vex-theme-graceful .vex-content ul,
+.vex.vex-theme-graceful .vex-content li {
+  color: inherit;
+}
+
+.vex.vex-theme-graceful .vex-content h1 {
   font-size: 30px;
 }
 
-.vex.vex-theme-os .vex-dialog-button {
- padding: 0.9em 2em;
+.vex.vex-theme-graceful .vex-content * {
+  color: inherit;
 }
 
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input textarea,
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="date"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="datetime"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="datetime-local"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="email"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="month"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="number"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="password"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="search"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="tel"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="text"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="time"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="url"],
-.vex.vex-theme-os .vex-dialog-form .vex-dialog-input input[type="week"] {
-  background: rgb(224, 224, 224);
+/* =======================================================
+ *                   Inputs and Buttons
+ * ======================================================= */
+.vex.vex-theme-graceful .vex-dialog-form .vex-dialog-message {
+  margin-bottom: 0.5em;
 }
+
+.vex.vex-theme-graceful .vex-dialog-form .vex-dialog-input {
+  margin-bottom: 1em;
+}
+
+.vex.vex-theme-graceful textarea,
+.vex.vex-theme-graceful input[type="date"],
+.vex.vex-theme-graceful input[type="datetime"],
+.vex.vex-theme-graceful input[type="datetime-local"],
+.vex.vex-theme-graceful input[type="email"],
+.vex.vex-theme-graceful input[type="month"],
+.vex.vex-theme-graceful input[type="number"],
+.vex.vex-theme-graceful input[type="password"],
+.vex.vex-theme-graceful input[type="search"],
+.vex.vex-theme-graceful input[type="tel"],
+.vex.vex-theme-graceful input[type="text"],
+.vex.vex-theme-graceful input[type="time"],
+.vex.vex-theme-graceful input[type="url"],
+.vex.vex-theme-graceful input[type="week"] {
+  width: 100%;
+  min-height: 2.5em;
+  margin: 0.5em 0;
+  padding: 0.2em 0.65em 0.2em 0;
+  border: 0;
+  border-bottom: 1px solid #fff;
+  font-family: Cousine;
+  font-size: 0.9em;
+  font-weight: bold;
+  background: inherit;
+  box-shadow: none;
+  color: inherit;
+}
+
+.vex.vex-theme-graceful input::-webkit-input-placeholder {
+  color: inherit;
+}
+
+.vex.vex-theme-graceful textarea:focus,
+.vex.vex-theme-graceful input[type="date"]:focus,
+.vex.vex-theme-graceful input[type="datetime"]:focus,
+.vex.vex-theme-graceful input[type="datetime-local"]:focus,
+.vex.vex-theme-graceful input[type="email"]:focus,
+.vex.vex-theme-graceful input[type="month"]:focus,
+.vex.vex-theme-graceful input[type="number"]:focus,
+.vex.vex-theme-graceful input[type="password"]:focus,
+.vex.vex-theme-graceful input[type="search"]:focus,
+.vex.vex-theme-graceful input[type="tel"]:focus,
+.vex.vex-theme-graceful input[type="text"]:focus,
+.vex.vex-theme-graceful input[type="time"]:focus,
+.vex.vex-theme-graceful input[type="url"]:focus,
+.vex.vex-theme-graceful input[type="week"]:focus {
+  border-color: 1px solid #3288e6;
+  outline: none;
+}
+
+.vex.vex-theme-graceful .vex-dialog-form .vex-dialog-buttons {
+  display: flex;
+  flex-direction: row-reverse; /* So that the OK button is on the right. */
+  margin-top: 40px;
+  color: inherit;
+}
+
+.vex.vex-theme-graceful .vex-dialog-button {
+  flex: 1 0 auto;
+  margin: 0 10px;
+  padding: 1em 1.6em;
+  border: 4px solid currentColor;
+  border-radius: 0;
+  background: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  line-height: 1em;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+  transition: opacity 300ms ease;
+}
+
+.vex.vex-theme-graceful .vex-dialog-button:focus,
+.vex.vex-theme-graceful .vex-dialog-button:hover {
+  opacity: 1;
+  outline: none;
+}
+
+.vex.vex-theme-graceful input::before {
+  content: "Hello:";
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  color: #fff;
+}
+
+.vex.vex-theme-graceful .vex-dialog-button:first-child {
+  margin-right: 0;
+}
+
+.vex.vex-theme-graceful .vex-dialog-button:last-child {
+  margin-left: 0;
+}
+
+.vex.vex-theme-graceful .vex-dialog-form .vex-dialog-buttons:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+.vex-loading-spinner.vex-theme-graceful {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2), 0 0 0.5em rgba(0, 0, 0, 0.2);
+  border-radius: 100%;
+  background: rgba(255, 255, 255, 0.2);
+  width: 0;
+  height: 0;
+  border: 1.2em solid #bbbbbb;
+  border-top-color: #f0f0f0;
+  border-bottom-color: #f0f0f0;
+}
+
+/* =======================================================
+ *                      Transitions
+ * ======================================================= */
+@-webkit-keyframes vex-flyin {
+  0%   { opacity: 0; -webkit-transform: translateY(-40px); }
+  100% { opacity: 1; -webkit-transform: translateY(0); }
+}
+
+@-webkit-keyframes vex-flyout {
+  0%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-40px); }
+}
+
+@-webkit-keyframes vex-pulse {
+  0%   { opacity: 0.75; } 
+  70%  { opacity: 1; } 
+  100% { opacity: 0.75; } 
+}
+
