@@ -365,6 +365,12 @@ body {
               border-bottom-width 300ms ease-in;
 }
 
+/* Fixes a bug where the command bar is initially positioned
+ * wrong on a pane above a closing pane, inside a vertical split. */
+.vertical-splitter-pane > .pane.above-closing {
+  border-bottom: 0;
+}
+
 .title-bar {
   transition: top 300ms ease-in;
 }

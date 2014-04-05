@@ -1009,7 +1009,7 @@
    */
   function Pane(editor, buffer, wrapper, type) {
     var _this = this;
-    var anchor;
+    var anchor, prevPane;
 
     // Mix in event handling.
     Observable.mixin(this);
@@ -1081,6 +1081,23 @@
     this.on('remove.start', function() {
       if (_this.linkingPanes) _this.unlinkAllPanes(true);
       _this.linkToPane(false, true);
+    });
+
+    // Adds a class to the pane above this one, if this pane is a vertical splitter pane.
+    // For an explanation of this, you can reference the CSS styles for the .above-closing
+    // class within editor.css.
+    this.on('remove.start', function() {
+      if (_this.wrapper.parentElement.classList.contains('vertical-splitter-pane')) {
+        if (_this.wrapper.previousElementSibling) {
+          prevPane = _this.wrapper.previousElementSibling.previousElementSibling;
+          prevPane.classList.add('above-closing');
+        }
+      }
+    });
+
+    // Removes the class added in the above function, if needed.
+    this.on('remove.end', function() {
+      if (prevPane) prevPane.classList.remove('above-closing');
     });
 
     // Run any post-initialization.
