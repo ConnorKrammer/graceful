@@ -39,7 +39,7 @@
         throw new Error('No argument passed to command.');
       }
 
-      if (arg === 'break') {
+      if (arg === 'break' && pane.linkedPane) {
         result = pane.linkToPane(false);
         if (!result) return;
       }
