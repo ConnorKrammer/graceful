@@ -1100,6 +1100,11 @@
       if (prevPane) prevPane.classList.remove('above-closing');
     });
 
+    // Listens for scroll events.
+    this.wrapper.addEventListener('scroll', function() {
+      _this.trigger('scroll');
+    });
+
     // Run any post-initialization.
     this.postInitialize();
 
@@ -1384,6 +1389,8 @@
    * @param {Object} [editorConfig] - A configuration object to pass to the CodeMirror constructor.
    */
   function InputPane(editor, buffer, wrapper, editorConfig) {
+    var _this = this;
+
     // Merge in defaults with the supplied configuration.
     editorConfig = _.merge({
       lineWrapping: true,
@@ -1395,6 +1402,9 @@
     
     // Create the editor.
     this.cm = CodeMirror(wrapper, editorConfig);
+
+    // Listen for scroll events.
+    this.cm.on('scroll', function() { _this.trigger('scroll'); });
 
     // Inherit from Pane.
     return Pane.call(this, editor, buffer, wrapper, 'input');
