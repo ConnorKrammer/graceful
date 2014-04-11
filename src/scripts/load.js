@@ -40,6 +40,8 @@
   graceful.coreExtensions = [
     'utils',
     'filesystem',
+    'command_manager',
+    'shell_api',
     'preferences',
     'dialog',
     'editor',
@@ -55,9 +57,6 @@
     load: libs,
     complete: function() {
       loadAsync(core)
-        .then(function() {
-          return loadAsync(core);
-        })
         .then(function() {
           return loadAndWait(loader.files);
         })

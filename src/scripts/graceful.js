@@ -9,6 +9,10 @@
 !function(global) {
   'use strict';
 
+/* =======================================================
+ *                       Graceful
+ * ======================================================= */
+
   /**
    * The Graceful class.
    *
@@ -69,8 +73,8 @@
 
   /**
    * Delays execution of the given function until after the application
-   * has finished intializing. If used after graceful has successfully
-   * initialized, the function will be called immediately.
+   * has finished intializing. The function will be called immediately
+   * if Graceful has finished loading.
    *
    * @param {Function} func - The function to delay.
    */
@@ -96,7 +100,10 @@
     this.isLoaded = true;
   };
 
-  // Expose globals.
+/* =======================================================
+ *                        Exports
+ * ======================================================= */
+
   global.Graceful = Graceful;
 }(this);
 
