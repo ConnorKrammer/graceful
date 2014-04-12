@@ -130,8 +130,8 @@
     // Get the application preference.
     appValue = reducePreference(key, prefs);
 
-    // Return the preference.
-    return userValue || appValue;
+    // Return a shallow copy of the preference.
+    return _.cloneDeep(userValue || appValue);
   };
 
   /**
