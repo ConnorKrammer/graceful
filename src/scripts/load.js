@@ -44,8 +44,7 @@
     'shell_api',
     'preferences',
     'dialog',
-    'editor',
-    'minimap'
+    'editor'
   ];
 
   var loader = graceful.loader;

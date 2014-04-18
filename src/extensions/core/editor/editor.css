@@ -21,6 +21,10 @@ body {
   outline-style: none;
 }
 
+::-webkit-scrollbar { 
+  display: none;
+}
+
 /* =======================================================
  *                        Editor
  *
@@ -68,12 +72,71 @@ body {
   border-color: transparent;
   background: rgb(250, 250, 250);
   -webkit-user-select: none;
+  -webkit-transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
 }
 
-.pane.input {
-  font-size: 17px;
-  line-height: 1.6;
-  font-family: Cousine;
+/* Font options are set in user preferences.
+ * For defaults, see editor.js. */
+.pane.input .input-area {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  margin: 0 auto;
+  background: none;
+}
+
+.pane.input .input-area.filetype-mkd {
+  max-width: 800px;
+}
+
+.pane.input .input-area .ace_gutter {
+  background: none;
+}
+
+/* An empty animation that's added to the .ping
+ * element so that completion can be listened for by JS. */
+@-webkit-keyframes pingPlaceholder {
+  0%   { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@-webkit-keyframes ping {
+  0%   { -webkit-transform: scale(0); opacity: 1; }
+  40%  { opacity: 1; }
+  100% { -webkit-transform: scale(1); opacity: 0; }
+}
+
+/* Animation duration should be as long as longest
+ * pseudo-element animation. */
+.ping {
+  position: absolute;
+  -webkit-animation: pingPlaceholder 1150ms;
+  z-index: 3;
+}
+
+.ping::before,
+.ping::after {
+  content: "";
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  left: -50px;
+  top: -50px;
+  display: block;
+  border-radius: 100%;
+  border: 5px solid rgb(0, 173, 255);
+  opacity: 0;
+  -webkit-transform: scale(0);
+}
+
+.ping::before {
+  -webkit-animation: ping 850ms ease-out;
+}
+
+.ping::after {
+  -webkit-animation: ping 850ms ease-out 300ms;
 }
 
 .pane.preview .preview-area {
@@ -98,6 +161,14 @@ body {
   box-sizing: content-box;
   transition: opacity 400ms ease;
   pointer-events: none;
+  -webkit-transform: translate3d(0,0,0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
+}
+
+.pane.opening .pane-overlay {
+  transition: none;
+  opacity: 1;
 }
 
 .showing-link .pane-overlay {
@@ -217,7 +288,6 @@ body {
   display: inline-block;
   border-color: black;
   border-style: solid;
-  background: rgb(250, 250, 250);
   box-sizing: content-box;
 }
 
@@ -483,6 +553,7 @@ body {
   background: rgb(0, 173, 255);
   -webkit-transform-origin: center top;
   -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
   opacity: 0;
 }
 
@@ -589,6 +660,25 @@ body {
  * Manages the styling of any CodeMirror elements as well
  * as any (default) theme-related styles.
  * ======================================================= */
+
+.input-area.centered-cursors .ace_cursor {
+  height: 1.4em !important; /* Overrides the style set by JS. */
+  margin-top: -0.2em;
+}
+
+.filetype-mkd .ace_line,
+.filetype-mkd .ace_line > span {
+  color: #000;
+}
+
+.filetype-mkd .ace_strong,
+.filetype-mkd .ace_heading {
+  font-weight: bold;
+}
+
+.filetype-mkd .ace_emphasis {
+  font-style: italic;
+}
 
 .CodeMirror {
   position: relative;

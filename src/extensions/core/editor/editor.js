@@ -12,8 +12,83 @@
   'use strict';
 
 /* =======================================================
+ *                   UndoManagerProxy
+ * ======================================================= */
+
+  /**
+   * The UndoManagerProxy class.
+   *
+   * Impersonates an UndoManager to allow two Ace Editor instances
+   * to share a document history (undo/redo). Used by the Buffer
+   * class when making linked copies of its root document.
+   *
+   * Copied wholesale from:
+   *  https://github.com/ajaxorg/ace/blob/a4a30b6665da5f5ef9c3bd23d7bac01374bae450/lib/ace/split.js
+   *
+   * @constructor
+   * @param {ace.UndoManager} undoManager - The UndoManager to impersonate.
+   * @param {ace.EditSession} session - The editing session to impersonate.
+   */
+  function UndoManagerProxy(undoManager, session) {
+    this.$u = undoManager;
+    this.$doc = session;
+  }
+
+  /**
+   * Impersonates an UndoManager's execute() method.
+   */
+  UndoManagerProxy.prototype.execute = function(options) {
+    this.$u.execute(options);
+  };
+
+  /**
+   * Impersonates an UndoManager's undo() method.
+   */
+  UndoManagerProxy.prototype.undo = function() {
+    var selectionRange = this.$u.undo(true);
+    if (selectionRange) {
+      this.$doc.selection.setSelectionRange(selectionRange);
+    }
+  };
+
+  /**
+   * Impersonates an UndoManager's redo() method.
+   */
+  UndoManagerProxy.prototype.redo = function() {
+    var selectionRange = this.$u.redo(true);
+    if (selectionRange) {
+      this.$doc.selection.setSelectionRange(selectionRange);
+    }
+  };
+
+  /**
+   * Impersonates an UndoManager's reset() method.
+   */
+  UndoManagerProxy.prototype.reset = function() {
+    this.$u.reset();
+  };
+
+  /**
+   * Impersonates an UndoManager's hasUndo() method.
+   */
+  UndoManagerProxy.prototype.hasUndo = function() {
+    return this.$u.hasUndo();
+  };
+
+  /**
+   * Impersonates an UndoManager's hasRedo() method.
+   */
+  UndoManagerProxy.prototype.hasRedo = function() {
+    return this.$u.hasRedo();
+  };
+
+
+/* =======================================================
  *                         Buffer
  * ======================================================= */
+
+  var Document = ace.require('./document').Document;
+  var lang     = ace.require('./lib/lang');
 
   // Counter for buffer IDs.
   var currentBufferID = 0;
@@ -27,12 +102,11 @@
    * @constructor
    * @param {String} [text=''] - The text to begin the document with.
    * @param {String} [filepath=null] - The filepath to associate the buffer with.
-   * @param {Object|String} [mode] - The CodeMirror mode to use for the document.
    * @param {Object} [history] - Any edit history to attach to the buffer.
    */
-  function Buffer(text, filepath, mode, history) {
+  function Buffer(text, filepath, history) {
     var _this = this;
-    var index, filetype;
+    var index, undoManager;
 
     // Mix in event handling.
     Observable.mixin(this);
@@ -44,28 +118,31 @@
     if (!filepath) {
       this.title = this.id > 0 ? 'new_' + this.id : 'new';
       this.filepath = null;
+      this.filetype = 'plaintext';
     } else {
       this.setFilepath(filepath);
     }
 
-    // Set default and allow easy access to document text.
+    // Defaults.
     this.text = text = text || '';
-
-    // Get the mode default.
-    mode = mode || detectMode(this.filepath, prefKeys.subKeys.inputMode);
+    undoManager = new ace.UndoManager();
 
     // The master document.
-    this.rootDoc = CodeMirror.Doc(text, mode);
+    this.session = new ace.EditSession(text);
+    this.session.setUndoManager(undoManager);
 
-    // Set the document history, if specified.
-    if (history) this.rootDoc.setHistory(history);
+    if (history) {
+      undoManager.$undoStack   = _.clone(history.$undoStack, true);
+      undoManager.$redoStack   = _.clone(history.$redoStack, true);
+      undoManager.dirtyCounter = _.clone(history.dirtyCounter, true);
+    }
 
     // Start with a clean state.
     this.markClean();
 
     // Allow changes to the root document to trigger a change event.
-    this.rootDoc.on('change', _.throttle(function(doc, change) {
-      _this.text = doc.getValue();
+    this.session.on('change', _.throttle(function() {
+      _this.text = _this.session.getValue();
       _this.markClean(false);
       _this.trigger('change.content', _this);
     }, 50));
@@ -82,17 +159,35 @@
    * @param {String} filepath - The filepath to associate with the buffer.
    */
   Buffer.prototype.setFilepath = function(filepath) {
-    // This gets the text after the last delimeter character and sets it as the title.
-    // If the string doesn't contain either '/' or '\', index will equal zero, and
-    // title will equal the whole string.
-    var index = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\')) + 1;
-    var title = filepath.substr(index);
+    var index, title, oldFiletype, filetype;
 
-    // Set the new filepath and title.
+    // Don't do anything if the path didn't really change.
+    if (filepath === this.filepath) return;
+
+    // Remember what the old filetype was.
+    oldFiletype = this.filetype;
+
+    // This gets the text after the last delimeter character and sets it as the title.
+    // If the string doesn't contain either '/' or '\', index will equal zero and
+    // title will equal the whole string.
+    index = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\')) + 1;
+    title = filepath.substr(index);
+
+    // Parse out the filetype.
+    if (filepath.indexOf('.') !== -1) {
+      index    = filepath.lastIndexOf('.');
+      filetype = filepath.substr(index + 1);
+    } else {
+      filetype = 'plaintext';
+    }
+
+    // Set the new filepath, filetype, and title.
     this.filepath = filepath;
-    this.title = title;
+    this.filetype = filetype;
+    this.title    = title;
 
     // Notify listeners that the filepath changed.
+    if (filetype !== oldFiletype) this.trigger('change.filetype', filetype);
     this.trigger('change.filepath', [filepath, title]);
   };
 
@@ -104,7 +199,7 @@
    * @param {Boolean} [isClean] - Whether to set the editor contents as clean.
    */
   Buffer.prototype.setContent = function(content, isClean) {
-    this.rootDoc.setValue(content);
+    this.session.setValue(content);
     this.markClean(isClean);
   };
 
@@ -119,36 +214,34 @@
   };
 
   /**
-   * Returns a linked CodeMirror document.
+   * Returns a synchronized Ace EditSession.
    *
-   * @return {CodeMirror.Doc} The linked document.
+   * See here for source:
+   *  https://github.com/ajaxorg/ace/blob/a4a30b6665da5f5ef9c3bd23d7bac01374bae450/lib/ace/split.js
+   *
+   * @return {ace.EditSession} The linked document.
    */
   Buffer.prototype.getLink = function() {
-    return this.rootDoc.linkedDoc({ sharedHist: true });
-  };
+    var session          = new ace.EditSession(this.session.getDocument(), this.session.getMode());
+    var undoManagerProxy = new UndoManagerProxy(this.session.getUndoManager(), session);
 
-  /**
-   * Detects a suitable mode from a filepath.
-   *
-   * If unable to detect a mode, the default is fetched from
-   * application preferences.
-   *
-   * @param {String} filepath - The path to detect the mode from.
-   * @param {String} key - The preference key to fetch the mode from.
-   * @return {Object} The detected mode object.
-   */
-   function detectMode(filepath, key) {
-    var index, filetype;
+    session.setUndoManager(undoManagerProxy);
 
-    if (filepath && filepath.indexOf('.') !== -1) {
-      index    = filepath.lastIndexOf('.');
-      filetype = filepath.substr(index + 1);
-    } else {
-      filetype = 'default';
-    }
+    // Overwrite the default $informUndoManager function such that new delas
+    // aren't added to the undo manager from the new and the old session.
+    session.$informUndoManager = lang.delayedCall(function() { session.$deltas = []; });
 
-    return Preferences.get(prefKeys.filetypes + '.' + filetype + '.' + key) ||
-      Preferences.get(prefKeys.filetypes + '.default.' + key);
+    // Copy over 'settings' from the session.
+    session.setTabSize(this.session.getTabSize());
+    session.setUseSoftTabs(this.session.getUseSoftTabs());
+    session.setOverwrite(this.session.getOverwrite());
+    session.setBreakpoints(this.session.getBreakpoints());
+    session.setUseWrapMode(this.session.getUseWrapMode());
+    session.setUseWorker(this.session.getUseWorker());
+    session.setWrapLimitRange(this.session.$wrapLimitRange.min, this.session.$wrapLimitRange.max);
+    session.$foldData = this.session.$cloneFoldData();
+
+    return session;
   };
 
   /**
@@ -271,7 +364,8 @@
    * Note that the link line is the line drawn when attempting to make a link, and the
    * link display line is the line drawn when showing an *existing* link.
    *
-   * For line drawing method, see {@link http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html|here}.
+   * See here for the origin of the line drawing method:
+   *   http://www.amaslo.com/2012/06/drawing-diagonal-line-in-htmlcssjs-with.html
    *
    * @todo Tidy up event handling.
    * @todo Rename event handlers to be more consistent.
@@ -1379,32 +1473,31 @@
    *
    * Input panes allow the user to type into a buffer.
    *
-   * For a description of valid values for the editorConfig parameter,
-   * see {@link http://codemirror.net//doc/manual.html#config|here}.
-   *
    * @constructor
    * @param {Editor} editor - The editor that the pane belongs to.
    * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
    * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
-   * @param {Object} [editorConfig] - A configuration object to pass to the CodeMirror constructor.
+   * @param {Object} [options] - A set of options that will override user-set preferences.
    */
-  function InputPane(editor, buffer, wrapper, editorConfig) {
+  function InputPane(editor, buffer, wrapper, options) {
     var _this = this;
 
-    // Merge in defaults with the supplied configuration.
-    editorConfig = _.merge({
-      lineWrapping: true,
-      undoDepth: 1000
-    }, editorConfig);
+    this.options = options || {};
 
-    // For CodeMirror, even though Pane() handles this later.
+    // For Ace, even though Pane() does this later.
     wrapper = wrapper || document.createElement('div');
     
-    // Create the editor.
-    this.cm = CodeMirror(wrapper, editorConfig);
+    // Create the editor wrapper.
+    this.inputWrapper = document.createElement('div');
+    this.inputWrapper.className = 'input-area';
+    wrapper.appendChild(this.inputWrapper);
 
-    // Listen for scroll events.
-    this.cm.on('scroll', function() { _this.trigger('scroll'); });
+    // Create the editor.
+    this.ace = ace.edit(this.inputWrapper);
+
+    this.ace.renderer.scrollBar.element.addEventListener('scroll', function() {
+      _this.trigger('scroll');
+    });
 
     // Inherit from Pane.
     return Pane.call(this, editor, buffer, wrapper, 'input');
@@ -1416,11 +1509,11 @@
   InputPane.prototype.postInitialize = function() {
     var _this = this;
 
-    // Make sure that the CodeMirror instance is refreshed upon resize.
-    this.on('resize', _.debounce(function() { _this.cm.refresh(); }, 100, {
-      leading: true,
-      trailing: true
-    }));
+    // Make sure that the editor instance is refreshed upon resize,
+    // without being called too often (causes animation lag.)
+    this.on('resize', _.debounce(function() {
+      _this.ace.resize();
+    }, 50));
 
     Pane.prototype.postInitialize.call(this);
   }
@@ -1428,13 +1521,70 @@
   /**
    * Sets the editor's mode.
    *
-   * For a description of valid values for the mode parameter,
-   * see {@link http://codemirror.net//doc/manual.html#option_mode|here}.
-   *
-   * @param {String|Object} mode The mode for the editor.
+   * @param {String} filetype - The filetype to get the mode of.
    */
-  InputPane.prototype.setMode = function(mode) {
-    this.cm.setOption('mode', mode);
+  InputPane.prototype.setMode = function(filetype) {
+    var prefKey      = prefKeys.filetypes + '.' + filetype + '.input';
+    var filePrefs    = Preferences.get(prefKey);
+    var defaultPrefs = Preferences.get(prefKeys.defaultFiletype + '.input');
+    var prefs        = _.merge(defaultPrefs, filePrefs, this.options);
+    var className    = this.inputWrapper.className;
+    var match        = className.match(/filetype-\w+/g);
+    var fontSize, lineHeight;
+
+    // Set a class on the input wrapper based on the file type.
+    if (match) this.inputWrapper.classList.remove(match);
+    this.inputWrapper.classList.add('filetype-' + filetype);
+    this.inputWrapper.offsetHeight; // Force reflow.
+
+    if (typeof prefs.animatedScroll        !== 'undefined') this.ace.setOption('animatedScroll', prefs.animatedScroll);
+    if (typeof prefs.behavioursEnabled     !== 'undefined') this.ace.setOption('behavioursEnabled', prefs.behavioursEnabled);
+    if (typeof prefs.displayIndentGuides   !== 'undefined') this.ace.setOption('displayIndentGuides', prefs.displayIndentGuides);
+    if (typeof prefs.dragDelay             !== 'undefined') this.ace.setOption('dragDelay', prefs.dragDelay);
+    if (typeof prefs.dragEnabled           !== 'undefined') this.ace.setOption('dragEnabled', prefs.dragEnabled);
+    if (typeof prefs.enableMultiselect     !== 'undefined') this.ace.setOption('enableMultiselect', prefs.enableMultiselect);
+    if (typeof prefs.fadeFoldWidgets       !== 'undefined') this.ace.setOption('fadeFoldWidgets', prefs.fadeFoldWidgets);
+    if (typeof prefs.firstLineNumber       !== 'undefined') this.ace.setOption('firstLineNumber', prefs.firstLineNumber);
+    if (typeof prefs.fixedWidthGutter      !== 'undefined') this.ace.setOption('fixedWidthGutter', prefs.fixedWidthGutter);
+    if (typeof prefs.foldStyle             !== 'undefined') this.ace.setOption('foldStyle', prefs.foldStyle);
+    if (typeof prefs.fontFamily            !== 'undefined') this.ace.setOption('fontFamily', prefs.fontFamily);
+    if (typeof prefs.fontSize              !== 'undefined') this.ace.setOption('fontSize', prefs.fontSize);
+    if (typeof prefs.highlightActiveLine   !== 'undefined') this.ace.setOption('highlightActiveLine', prefs.highlightActiveLine);
+    if (typeof prefs.highlightGutterLine   !== 'undefined') this.ace.setOption('highlightGutterLine', prefs.highlightGutterLine);
+    if (typeof prefs.highlightSelectedWord !== 'undefined') this.ace.setOption('highlightSelectedWord', prefs.highlightSelectedWord);
+    if (typeof prefs.mode                  !== 'undefined') this.ace.setOption('mode', prefs.mode);
+    if (typeof prefs.printMargin           !== 'undefined') this.ace.setOption('printMargin', prefs.printMargin);
+    if (typeof prefs.printMarginColumn     !== 'undefined') this.ace.setOption('printMarginColumn', prefs.printMarginColumn);
+    if (typeof prefs.scrollPastEnd         !== 'undefined') this.ace.setOption('scrollPastEnd', prefs.scrollPastEnd);
+    if (typeof prefs.scrollSpeed           !== 'undefined') this.ace.setOption('scrollSpeed', prefs.scrollSpeed);
+    if (typeof prefs.showFoldWidgets       !== 'undefined') this.ace.setOption('showFoldWidgets', prefs.showFoldWidgets);
+    if (typeof prefs.showGutter            !== 'undefined') this.ace.setOption('showGutter', prefs.showGutter);
+    if (typeof prefs.showInvisibles        !== 'undefined') this.ace.setOption('showInvisibles', prefs.showInvisibles);
+    if (typeof prefs.showPrintMargin       !== 'undefined') this.ace.setOption('showPrintMargin', prefs.showPrintMargin);
+    if (typeof prefs.smoothBlinking        !== 'undefined') this.ace.renderer.$cursorLayer.setSmoothBlinking(prefs.smoothBlinking);
+    if (typeof prefs.tabSize               !== 'undefined') this.ace.setOption('tabSize', prefs.tabsSize);
+    if (typeof prefs.useSoftTabs           !== 'undefined') this.ace.setOption('useSoftTabs', prefs.useSoftTabs);
+    if (typeof prefs.wrap                  !== 'undefined') this.ace.setOption('wrap', prefs.wrap);
+    if (typeof prefs.wrapBehavioursEnabled !== 'undefined') this.ace.setOption('wrapBehavioursEnabled', prefs.wrapBehavioursEnabled);
+
+    // String value = absolute line height.
+    // Number value = line height relative to font size.
+    if (typeof prefs.lineHeight !== 'undefined') {
+      fontSize = this.ace.getOption('fontSize');
+      lineHeight = (typeof prefs.lineHeight === 'string')
+        ? parseInt(prefs.lineHeight, 10)
+        : fontSize * prefs.lineHeight;
+
+      // Set the line height.
+      this.ace.renderer.lineHeight = lineHeight;
+
+      // Styles the cursor differently if the line height is
+      // larger than the font size by 20% or more.
+      this.inputWrapper.classList.toggle('centered-cursors', lineHeight / fontSize > 1.2);
+    }
+
+    // Notify listeners about the change.
+    this.trigger('change.mode');
   };
 
   /**
@@ -1444,12 +1594,12 @@
     var _this = this;
     
     // Track focus event.
-    this.cm.on('focus', function() {
+    this.ace.on('focus', function() {
       _this.setFocus('inputFocus', true);
     });
 
     // Track blur event.
-    this.cm.on('blur', function() {
+    this.ace.on('blur', function() {
       _this.setFocus('inputFocus', false);
     });
 
@@ -1460,7 +1610,7 @@
    * Overrides Pane.focus().
    */
   InputPane.prototype.focus = function() {
-    this.cm.focus();
+    this.ace.focus();
   };
 
   /**
@@ -1475,19 +1625,19 @@
     var _this = this;
 
     this.doc = buffer.getLink();
-    this.cm.swapDoc(this.doc);
-    this.cm.refresh();
+    this.ace.setSession(this.doc);
+    this.ace.resize();
 
     // Remove old event listeners.
     if (this.buffer) this.buffer.off(this.filetypeChangeID);
     
     // Listen for filepath changes on the new buffer.
-    this.filetypeChangeID = buffer.on('change.filepath', function(filepath, title) {
-      _this.setMode(detectMode(filepath, prefKeys.subKeys.inputMode));
+    this.filetypeChangeID = buffer.on('change.filetype', function(filetype) {
+      _this.setMode(filetype);
     });
 
-    // Detect and set a mode.
-    this.setMode(detectMode(buffer.filepath, prefKeys.subKeys.inputMode));
+    // Set the mode.
+    this.setMode(buffer.filetype);
     
     return Pane.prototype.switchBuffer.call(this, buffer, breakLink);
   };
@@ -1541,11 +1691,11 @@
    * @param {Editor} editor - The editor that the pane belongs to.
    * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
    * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
-   * @param {Function} [parse] - The parsing function, which accepts a string as input and returns it parsed.
+   * @param {Object} [options] - A set of options that will override user-set preferences.
    */
-  function PreviewPane(editor, buffer, wrapper, parse) {
+  function PreviewPane(editor, buffer, wrapper, options) {
     // The preview function.
-    this.parse = parse || PreviewPane.getMode(detectMode(buffer.filepath, prefKeys.subKeys.previewMode));
+    this.options = options || {};
 
     // Add a preview area to the wrapper.
     this.previewArea = document.createElement('div');
@@ -1569,23 +1719,43 @@
 
     // Stop tracking the old buffer's changes.
     if (this.buffer) this.buffer.off(this.filetypeChangeID);
+    if (this.buffer) this.buffer.off(this.filepathChangeID);
     if (this.buffer) this.buffer.off(this.changeID);
     
+    // Listen for filetype changes on the new buffer.
+    this.filetypeChangeID = buffer.on('change.filetype', function(filetype) {
+      _this.setMode(filetype);
+    });
+
     // Listen for filepath changes on the new buffer.
-    this.filetypeChangeID = buffer.on('change.filepath', function(filepath, title) {
-      _this.parse = PreviewPane.getMode(detectMode(filepath, prefKeys.subKeys.previewMode));
+    this.filepathChangeID = buffer.on('change.filepath', function(filepath, title) {
+      _this.preview(buffer);
     });
 
     // Listen for content changes on the new buffer.
     this.changeID = buffer.on('change.content', function() { _this.preview(buffer); });
 
-    // Detect and set the parsing mode.
-    this.parse = PreviewPane.getMode(detectMode(buffer.filepath, prefKeys.subKeys.previewMode));
+    // Set the parsing mode.
+    this.setMode(buffer.filetype);
 
     // Preview the buffer.
     this.preview(buffer);
 
     return Pane.prototype.switchBuffer.call(this, buffer, breakLink);
+  };
+
+  /**
+   * Sets the preview mode.
+   *
+   * @param {String} filetype - The filetype to get the mode of.
+   */
+  PreviewPane.prototype.setMode = function(filetype) {
+    var prefKey      = prefKeys.filetypes + '.' + filetype + '.preview';
+    var filePrefs    = Preferences.get(prefKey);
+    var defaultPrefs = Preferences.get(prefKeys.defaultFiletype + '.preview');
+    var prefs        = _.merge(defaultPrefs, filePrefs, this.options);
+
+    this.parse = PreviewPane.getMode(prefs.mode);
   };
 
   /**
@@ -1634,14 +1804,14 @@
   }
 
   /**
-   * Outdated function that is currently being used for setup.
-   *
-   * @todo Get rid of this.
+   * Set up the editor.
    */
   Editor.prototype.init = function() {
     // Add the test panes.
     var input = this.addPane(InputPane, null, 'horizontal', null, true);
-    var preview = this.addPane(PreviewPane, null, 'horizontal', null, true);
+    //var preview = this.addPane(PreviewPane, null, 'horizontal', null, true);
+
+    input.focus();
   };
 
   /**
@@ -1768,7 +1938,7 @@
       if (type === 'vertical') {
         _.forEach(_this.panes, function(pane) {
           if (pane instanceof InputPane) {
-            pane.cm.refresh();
+            pane.ace.resize();
           }
         });
       }
@@ -2449,6 +2619,8 @@
       // Disable transition.
       if (isInstant) child.classList.add('disable-transition');
 
+      child.classList.add('resizing');
+
       // Set the new size.
       child.style[property] = size + '%';
       child.style[otherProperty] = '';
@@ -2467,7 +2639,13 @@
 
     if (isInstant) {
       triggerResize();
+
+      for (var i = 0; i < children.length; i += 2) {
+        children[i].classList.remove('resizing');
+      }
+
       if (typeof callback === 'function') callback();
+
       return;
     }
 
@@ -2478,8 +2656,15 @@
     child.addEventListener('transitionend', function listen(event) {
       if (event.propertyName === property) {
         clearInterval(interval);
+
         triggerResize();
+
+        for (var i = 0; i < children.length; i += 2) {
+          children[i].classList.remove('resizing');
+        }
+
         if (typeof callback === 'function') callback();
+
         child.removeEventListener('transitionend', listen);
       }
     });
@@ -2839,18 +3024,75 @@
 
   // Preference keys.
   var prefKeys = {
-    root:      'extensions.editor',
-    filetypes: 'extensions.editor.filetypes',
+    root:            'extensions.editor',
+    filetypes:       'extensions.editor.filetypes',
+    defaultFiletype: 'extensions.editor.filetypes.plaintext',
     subKeys: {
-      inputMode:   'inputmode',
-      previewMode: 'previewmode'
+      input:   'input',
+      preview: 'preview',
     }
   };
 
-  // Set defaults.
-  Preferences.default([prefKeys.filetypes + '.mkd', prefKeys.filetypes + '.default'], {
-    inputmode: 'markdown-lite',
-    previewmode: 'markdown'
+  Preferences.default(prefKeys.defaultFiletype, {
+    input: {
+      animatedScroll:        false,
+      behavioursEnabled:     true,
+      displayIndentGuides:   true,
+      dragDelay:             150,
+      dragEnabled:           true,
+      enableMultiselect:     true,
+      fadeFoldWidgets:       true,
+      firstLineNumber:       1,
+      fixedWidthGutter:      true,
+      foldStyle:             undefined,
+      fontFamily:            'Cousine',
+      fontSize:              16,
+      highlightActiveLine:   false,
+      highlightGutterLine:   false,
+      highlightSelectedWord: true,
+      lineHeight:            1.2, /* Pixel value or multipler of text (just like CSS). */
+      mode:                  'ace/mode/plain_text',
+      printMargin:           false,
+      printMarginColumn:     80,
+      scrollPastEnd:         true,
+      scrollSpeed:           1.3,
+      showFoldWidgets:       true,
+      showGutter:            true,
+      showInvisibles:        false,
+      showPrintMargin:       false,
+      smoothBlinking:        true,
+      tabSize:               4,
+      useSoftTabs:           true,
+      wrap:                  true, /* (true|'free') | (false|'off') | (-1|'printMargin') | (Integer) */
+      wrapBehavioursEnabled: true
+    },
+    preview: {
+      mode: 'plain_text'
+    }
+  });
+
+  Preferences.default(prefKeys.filetypes + '.js', {
+    input: {
+      mode: 'ace/mode/javascript',
+      fontFamily: 'Consolas',
+      fontSize: 14
+    }
+  });
+
+  Preferences.default(prefKeys.filetypes + '.mkd', {
+    input: {
+      mode: 'ace/mode/markdown',
+      showGutter:          false,
+      displayIndentGuides: false,
+      lineHeight:          1.6
+    },
+    preview: {
+      mode: 'markdown'
+    }
+  });
+
+  PreviewPane.registerMode('plain_text', function(input) {
+    return input;
   });
 
   /**
