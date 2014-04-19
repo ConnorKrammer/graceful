@@ -320,7 +320,7 @@
    *       When the python API is implemented it will allow a simple method
    *       of checking for absolute filepaths.
    *
-   * @param {Editor.pane} pane - The pane to open the file in.
+   * @param {Editor.Pane} pane - The pane to open the file in.
    * @param {String} path - The path to open. If not specified,
    *        the user will be prompted to choose a destination. If
    *        the buffer has a filepath associated with it, the path
@@ -357,7 +357,7 @@
                     buffer = bufferList.find(selection) || new Editor.Buffer(contents, selection);
                     pane.switchBuffer(buffer, true);
                 });
-              })
+              });
           }
           else if (!type || !path) {
             // If there is no path, start the open dialogue at the last used location.
@@ -383,7 +383,7 @@
    * @todo When recursively creating a new directory, only the end directory
    *       is deleted again when cancelling. All created directories should be.
    *
-   * @param {Editor.pane} pane - The pane to open the file in.
+   * @param {Editor.Pane} pane - The pane to open the file in.
    * @param {String} path - The path to save to. If not specified,
    *        the user will be prompted to choose a destination. If
    *        the buffer has a filepath associated with it, the path
@@ -459,6 +459,201 @@
               });
           }
         });
+    }
+  });
+
+  /**
+   * Starts a 'ripple' animation around the cursor to help the user find it.
+   *
+   * @param {Editor.InputPane} pane - The pane to add the animation to.
+   * @return {Promise} A promise for the animation's completion.
+   */
+  function pingCursor(pane) {
+    var deferred = Q.defer();
+    var ace = pane.ace;
+
+    // Calculate positioning and offsets.
+    var cursorElement   = ace.renderer.$cursorLayer.cursor;
+    var cursorPosition  = cursorElement.getBoundingClientRect();
+    var panePosition    = pane.wrapper.getBoundingClientRect();
+    var inputPosition   = pane.inputWrapper.getBoundingClientRect();
+    var cursorThickness = parseInt(getComputedStyle(cursorElement).borderLeftWidth, 10);
+    var offsetLeft      = (cursorThickness || cursorPosition.width) / 2;
+    var offsetTop       = cursorPosition.height / 2;
+
+    // Create a new ping element.
+    var pingElement = document.createElement('div');
+    pingElement.className = 'ping';
+
+    // Position the element.
+    // inputPosition.top is used in the second calculation instead of panePosition.top
+    // because panePosition.top ignores the interior border that offsets its contents.
+    pingElement.style.left = (cursorPosition.left - panePosition.left + offsetLeft) + 'px';
+    pingElement.style.top  = (cursorPosition.top  - inputPosition.top + offsetTop)  + 'px';
+
+    // Add it to the DOM.
+    pane.wrapper.appendChild(pingElement);
+
+    pingElement.addEventListener('webkitAnimationEnd', function(event) {
+      if (event.animationName === 'pingPlaceholder') {
+        deferred.resolve();
+        pane.wrapper.removeChild(pingElement); // Also removes this listener.
+      }
+    });
+
+    return deferred.promise;
+  }
+
+  /**
+   * Gets a percentage from natural english.
+   * Returns the input if it can't be parsed.
+   *
+   * @param {String} input - The input to parse.
+   * @return {String} The parsed input.
+   */
+  function parseNatualLanguage(input) {
+    if (input === 'start') {
+      return '0';
+    }
+    else if (input === 'half' || input === 'middle') {
+      return '50%';
+    }
+    else if (input === 'end'  || input === 'full') {
+      return '100%';
+    }
+    else {
+      return input;
+    }
+  }
+
+  /**
+   * Gets a percentage or number from a decimal value.
+   * Returns the input if it can't be parsed.
+   *
+   * @param {String} input - The input to parse.
+   * @return {String} The parsed input.
+   */
+  function parseDecimal(input) {
+    var value = parseFloat(input, 10);
+
+    // Handle decimals <= 1 as percents, and decimals > 1 as plain numbers.
+    if (input.indexOf('.') !== -1 && input.indexOf('%') === -1) {
+      input = (value > 1) ? value + '' : (value * 100) + '%';
+    }
+
+    return input;
+  }
+
+  /**
+   * Jumps the editor to a given position line number or percent position.
+   *
+   * This will parse the following values:
+   *
+   *   Notation:
+   *   {x}   - Jump to the given row/column.
+   *   {x}%  - Jump to the given row/column by percent of total length.
+   *   {x.x} - Jump to the given row/column by decimal of total length,
+   *           equivalent to a percent in decimal notation. If the decimal
+   *           is > 1.0, it is treated as a plain line number.
+   *
+   *   Any of the above can be prefixed with + or - to denote a relative jump.
+   *
+   *   Using natural language:
+   *   {start}       - Jump to the first row/column.
+   *   {middle|half} - Jump to the middle row/column.
+   *   {end|full}    - Jump to the last row/column.
+   *
+   * @todo Allow jumping to set positions, headers, or regex searches.
+   *
+   * @param {Editor.InputPane} pane - The pane to jump to the position in.
+   * @param {String|Number} targetY - The row or vertical percent position to jump to.
+   * @param {String|Number} targetX - The column or horizontal percent position to jump to.
+   */
+  graceful.editor.defineCommand({
+    name: 'jump',
+    argCount: 2,
+    func: function(pane, targetY, targetX) {
+      var ace, lineCount, currentRow, relativeY, relativeY, percent,
+        lineLength, row, column;
+
+      // Handle invalid arguments.
+      if (pane instanceof Editor.InputPane === false) return;
+      if (typeof targetY === 'undefined') return;
+      if (typeof targetX === 'undefined') targetX = '0';
+
+      ace        = pane.ace;
+      lineCount  = ace.session.getLength();
+      currentRow = ace.getCursorPosition().row;
+      targetY    = targetY.toLowerCase();
+      targetX    = targetX.toLowerCase();
+
+      // Parse relative values.
+      if (targetY[0] === '+') {
+        relativeY = 1;
+        targetY = targetY.substr(1);
+      }
+      else if (targetY[0] === '-') {
+        relativeY = -1;
+        targetY = targetY.substr(1);
+      }
+
+      // Handle shorthand values.
+      targetY = parseNatualLanguage(targetY);
+      targetX = parseNatualLanguage(targetX);
+      targetY = parseDecimal(targetY);
+      targetX = parseDecimal(targetX);
+
+      // Parse the requested row.
+      if (targetY.indexOf('%') !== -1) {
+        percent = parseFloat(targetY) / 100;
+        row = Math.round(lineCount * percent);
+      } else {
+        row = parseInt(targetY, 10);
+      }
+
+      // If the row couldn't be parsed, exit.
+      if (isNaN(row)) return;
+
+      // Move relative to current position.
+      if (relativeY) row = currentRow + (row * relativeY);
+
+      // Keep the row within the bounds of the document.
+      if (row < 1) row = 1;
+      else if (row > lineCount) row = lineCount;
+
+      // Parse the requested column.
+      if (targetX.indexOf('%') !== -1) {
+        percent = parseFloat(targetX) / 100;
+        lineLength = ace.session.getLine(row - 1).length;
+        column = Math.round(lineLength * percent);
+      } else {
+        column = parseInt(targetX, 10);
+      }
+
+      // If the column couldn't be parsed, default to 0.
+      if (isNaN(column)) column = 0;
+
+      // Go to the requested line and force an update.
+      ace.gotoLine(row, column, false);
+      ace.renderer.updateFull(true);
+
+      // Show the user where the cursor is.
+      return pingCursor(pane);
+    }
+  });
+
+  /**
+   * Starts a 'ripple' animation around the cursor to help the user find it.
+   *
+   * @param {Editor.InputPane} pane - The pane to add the animation to.
+   * @return {Promise} A promise for the animation's completion.
+   */
+  graceful.editor.defineCommand({
+    name: 'ping',
+    func: function(pane) {
+      if (pane instanceof Editor.InputPane) {
+        return pingCursor(pane);
+      }
     }
   });
 
