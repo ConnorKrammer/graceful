@@ -685,6 +685,10 @@ body {
   background: none;
 }
 
+.input-area .ace_scroller {
+  cursor: text;
+}
+
 .filetype-mkd .ace_line_group * {
   color: #000;
 }
