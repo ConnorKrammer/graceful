@@ -49,6 +49,25 @@
       .then(function(contents) {
         userPrefs = contents ? JSON.parse(contents) : {};
       })
+      .then(function() {
+        /**
+         * If in developer mode, add a function to allow
+         * clearing preferences.
+         *
+         * @todo: Eventually move this into its own file
+         *        with other developer utilities, and load
+         *        it conditionally.
+         *
+         * @todo: Add a UI option/editor command to easily
+         *        allow toggling developer mode.
+         */
+        if (Preferences.get('devmode') === true) {
+          Preferences.clear = function() {
+            prefs = {};
+            FileSystem.writeFile(graceful.preferenceFile, JSON.stringify(prefs, null, 4));
+          }
+        }
+      })
       .fail(function(error) {
         Utils.printFormattedError('Preferences failed to load with error:', error);
       });
