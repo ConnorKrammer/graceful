@@ -100,7 +100,9 @@
     var command = commands[id] || noop;
     var args    = Array.prototype.slice.call(arguments, 1);
 
-    this.trigger('beforeExecuteCommand', id);
+    if (command !== noop) {
+      this.trigger('beforeExecuteCommand', id);
+    }
 
     return command.execute.apply(command, args);
   };
