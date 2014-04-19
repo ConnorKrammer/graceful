@@ -77,105 +77,6 @@ body {
   -webkit-perspective: 1000;
 }
 
-/* Font options are set in user preferences.
- * For defaults, see editor.js. */
-.pane.input .input-area {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  margin: 0 auto;
-  background: none;
-}
-
-.pane.input .input-area.filetype-mkd {
-  max-width: 800px;
-}
-
-.pane.input .input-area .ace_gutter {
-  background: none;
-}
-
-/* An empty animation that's added to the .ping
- * element so that completion can be listened for by JS. */
-@-webkit-keyframes pingPlaceholder {
-  0%   { opacity: 1; }
-  100% { opacity: 1; }
-}
-
-@-webkit-keyframes ping {
-  0%   { -webkit-transform: scale(0); opacity: 1; }
-  40%  { opacity: 1; }
-  100% { -webkit-transform: scale(1); opacity: 0; }
-}
-
-/* Animation duration should be as long as longest
- * pseudo-element animation. */
-.ping {
-  position: absolute;
-  -webkit-animation: pingPlaceholder 1150ms;
-  z-index: 3;
-}
-
-.ping::before,
-.ping::after {
-  content: "";
-  position: absolute;
-  width: 100px;
-  height: 100px;
-  left: -50px;
-  top: -50px;
-  display: block;
-  border-radius: 100%;
-  border: 5px solid rgb(0, 173, 255);
-  opacity: 0;
-  -webkit-transform: scale(0);
-}
-
-.ping::before {
-  -webkit-animation: ping 850ms ease-out;
-}
-
-.ping::after {
-  -webkit-animation: ping 850ms ease-out 300ms;
-}
-
-.pane.preview .preview-area {
-  height: 100%;
-  white-space: pre-wrap;
-  overflow-y: auto;
-  word-wrap: break-word;
-}
-
-.pane-overlay {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  bottom: 0;
-  left: 0;
-  border-width: 0;
-  border-style: solid;
-  border-color: rgb(250, 250, 250);
-  background: rgb(250, 250, 250);
-  opacity: 0;
-  z-index: 4;
-  box-sizing: content-box;
-  transition: opacity 400ms ease;
-  pointer-events: none;
-  -webkit-transform: translate3d(0,0,0);
-  -webkit-backface-visibility: hidden;
-  -webkit-perspective: 1000;
-}
-
-.pane.opening .pane-overlay {
-  transition: none;
-  opacity: 1;
-}
-
-.showing-link .pane-overlay {
-  opacity: 0.95;
-  pointer-events: auto;
-}
-
 #editor > .pane {
   position: relative;
   display: inline-block;
@@ -218,6 +119,68 @@ body {
   padding: 0 15px;
 }
 
+/* ============ Type-specific Pane Styles ============ */
+
+/* Font options are set in user preferences.
+ * For defaults, see editor.js or check out
+ * the preference file. */
+.pane.input .input-area {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  margin: 0 auto;
+  background: none;
+}
+
+.pane.input .input-area.filetype-mkd {
+  max-width: 800px;
+}
+
+.pane.preview .preview-area {
+  height: 100%;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  word-wrap: break-word;
+}
+
+/* =======================================================
+ *                     Pane Overlay
+ *
+ * This element fits over the pane exactly and is used to
+ * fade content in and out at various times, such as
+ * during link management mode or when the pane first
+ * opens.
+ * ======================================================= */
+
+.pane-overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  bottom: 0;
+  left: 0;
+  border-width: 0;
+  border-style: solid;
+  border-color: rgb(250, 250, 250);
+  background: rgb(250, 250, 250);
+  opacity: 0;
+  z-index: 4;
+  box-sizing: content-box;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+  -webkit-transform: translate3d(0,0,0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
+}
+
+.pane.opening .pane-overlay {
+  transition: none;
+  opacity: 1;
+}
+
+.showing-link .pane-overlay {
+  opacity: 0.95;
+  pointer-events: auto;
+}
 
 /* =======================================================
  *                      Command Bar
@@ -410,6 +373,7 @@ body {
  * and offsets need to be transitioned as well, and you
  * can see that here.
  * ======================================================= */
+
 .splitter-horizontal {
   transition: width       500ms ease-in,
               margin-left 500ms ease-in,
@@ -655,10 +619,61 @@ body {
 }
 
 /* =======================================================
- *                       CodeMirror
+ *            Visual Elements - Miscellaneous
  *
- * Manages the styling of any CodeMirror elements as well
- * as any (default) theme-related styles.
+ * Various visual styles that don't fit better in another
+ * group. The .ping styles, for example, are used for an
+ * editor command.
+ * ======================================================= */
+
+/* An empty animation that's added to the .ping
+ * element so that completion can be listened for by JS. */
+@-webkit-keyframes pingPlaceholder {
+  0%   { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@-webkit-keyframes ping {
+  0%   { -webkit-transform: scale(0); opacity: 1; }
+  40%  { opacity: 1; }
+  100% { -webkit-transform: scale(1); opacity: 0; }
+}
+
+/* Animation duration should be as long as longest
+ * pseudo-element animation. */
+.ping {
+  position: absolute;
+  -webkit-animation: pingPlaceholder 1150ms;
+  z-index: 3;
+}
+
+.ping::before,
+.ping::after {
+  content: "";
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  left: -50px;
+  top: -50px;
+  display: block;
+  border-radius: 100%;
+  border: 5px solid rgb(0, 173, 255);
+  opacity: 0;
+  -webkit-transform: scale(0);
+}
+
+.ping::before {
+  -webkit-animation: ping 850ms ease-out;
+}
+
+.ping::after {
+  -webkit-animation: ping 850ms ease-out 300ms;
+}
+
+/* =======================================================
+ *                      Ace Editor
+ *
+ * Styles Ace editor components and syntax highlighting.
  * ======================================================= */
 
 .input-area.centered-cursors .ace_cursor {
@@ -666,13 +681,20 @@ body {
   margin-top: -0.2em;
 }
 
-.filetype-mkd .ace_line,
-.filetype-mkd .ace_line > span {
+.input-area .ace_gutter {
+  background: none;
+}
+
+.filetype-mkd .ace_line_group * {
   color: #000;
 }
 
-.filetype-mkd .ace_strong,
-.filetype-mkd .ace_heading {
+.filetype-mkd .ace_line_group .ace_invisible {
+  color: #ccc;
+}
+
+.filetype-mkd .ace_line_group .ace_strong,
+.filetype-mkd .ace_line_group .ace_heading {
   font-weight: bold;
 }
 
@@ -680,61 +702,3 @@ body {
   font-style: italic;
 }
 
-.CodeMirror {
-  position: relative;
-  height: 100%;
-  max-width: 800px;
-  margin-left: auto;
-  margin-right: auto;
-  font-size: inherit;
-  line-height: inherit;
-  font-family: inherit;
-  background: none;
-}
-
-.CodeMirror ::-webkit-scrollbar {
-  display: none;
-}
-
-/* Use a gradient to make a strikethrough. This allows the line
- * thickness to be proportional to the text size. */
-.cm-strikethrough {
-  background: -webkit-linear-gradient(top, 
-    transparent 0%,
-    transparent 47%,
-    currentColor 48%,
-    currentColor 52%,
-    transparent 53%,
-    transparent 100%);
-}
-
-/* No strikethrough on the formatting characters. */
-.cm-formatting-strikethrough {
-  background: none;
-}
-
-.cm-formatting-strong,
-.cm-formatting-em { 
-  font-weight: normal;
-  font-style: normal;
-}
-
-.cm-header {
-  font-weight: bold;
-}
-
-/* These underlines look odd if styled, since the headers that
- * they apply to (in markdown syntax) aren't styled to match. */
-.cm-header.cm-header-underline-1,
-.cm-header.cm-header-underline-2 {
-  font-size: 1em;
-  font-weight: normal;
-}
-
-.cm-header   { color: #000 !important; }
-.cm-header-1 { font-size: 2.0em; }
-.cm-header-2 { font-size: 1.9em; }
-.cm-header-3 { font-size: 1.8em; }
-.cm-header-4 { font-size: 1.6em; }
-.cm-header-5 { font-size: 1.4em; }
-.cm-header-6 { font-size: 1.2em; }
