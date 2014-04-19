@@ -1967,11 +1967,11 @@
     var sibling          = pane.wrapper.previousElementSibling || pane.wrapper.nextElementSibling;
     var containerParent  = container.parentElement;
     var containerSibling = container.previousElementSibling || container.nextElementSibling;
-    var shouldRefocus    = this.hasFocusedPane() ? pane === this.getFocusPane() : false;
+    var shouldRefocus    = pane === this.getFocusPane();
     var wrapper, splitter, parentElement, direction, newFocus, interval;
 
-    // Separate cases are needed for cases including vertical splitters.
-    // For example, removing the last pane in a vertical split should also remove the split.
+    // A separate case is needed for vertical split panes. For example, removing
+    // the last pane in a vertical split should also remove the split container.
     var shouldRemovePane = sibling && sibling.classList.contains('splitter');
     var shouldRemoveParent = !sibling && containerSibling
       && container.classList.contains('vertical-splitter-pane')
@@ -2289,7 +2289,6 @@
     this.isManagingLinks = false;
     this.container.classList.remove('managing-links');
   };
-
 
   /**
    * Checks for the presence of a focused pane.
