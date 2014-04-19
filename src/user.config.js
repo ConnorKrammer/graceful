@@ -511,7 +511,7 @@
    * @param {String} input - The input to parse.
    * @return {String} The parsed input.
    */
-  function parseNatualLanguage(input) {
+  function parseNaturalLanguage(input) {
     if (input === 'start') {
       return '0';
     }
@@ -538,7 +538,7 @@
 
     // Handle decimals <= 1 as percents, and decimals > 1 as plain numbers.
     if (input.indexOf('.') !== -1 && input.indexOf('%') === -1) {
-      input = (value > 1) ? value + '' : (value * 100) + '%';
+      input = (value > 1) ? Math.round(value) + '' : (value * 100) + '%';
     }
 
     return input;
@@ -556,7 +556,10 @@
    *           equivalent to a percent in decimal notation. If the decimal
    *           is > 1.0, it is treated as a plain line number.
    *
-   *   Any of the above can be prefixed with + or - to denote a relative jump.
+   *   Any of the above can be prefixed with + or - to denote a relative jump. In the
+   *   case of rows, the jump will be relative the current position, while columns will
+   *   be determined normally for positive values, and relative the end for negative
+   *   values. (So "jump 100 -5" jumps to row 100, 5 columns from the end.)
    *
    *   Using natural language:
    *   {start}       - Jump to the first row/column.
@@ -573,13 +576,13 @@
     name: 'jump',
     argCount: 2,
     func: function(pane, targetY, targetX) {
-      var ace, lineCount, currentRow, relativeY, relativeY, percent,
-        lineLength, row, column;
+      var ace, lineCount, currentRow, relativeY, relativeX, percent,
+        lineContent, lineLength, row, column;
 
       // Handle invalid arguments.
       if (pane instanceof Editor.InputPane === false) return;
       if (typeof targetY === 'undefined') return;
-      if (typeof targetX === 'undefined') targetX = '0';
+      if (typeof targetX === 'undefined') targetX = '';
 
       ace        = pane.ace;
       lineCount  = ace.session.getLength();
@@ -596,10 +599,32 @@
         relativeY = -1;
         targetY = targetY.substr(1);
       }
+      else {
+        relativeY = false;
+      }
 
-      // Handle shorthand values.
-      targetY = parseNatualLanguage(targetY);
-      targetX = parseNatualLanguage(targetX);
+      if (targetX[0] === '-') {
+        relativeX = -1;
+        targetX = targetX.substr(1);
+      } else {
+        relativeX = false;
+      }
+
+      // Parse natural language arguments.
+      var tempY = parseNaturalLanguage(targetY);
+      var tempX = parseNaturalLanguage(targetX);
+
+      if (tempY !== targetY) {
+        relativeY = false;
+        targetY = tempY;
+      }
+
+      if (tempX !== targetX) {
+        relativeX = false;
+        targetX = tempX;
+      }
+
+      // Parse decimal notation.
       targetY = parseDecimal(targetY);
       targetX = parseDecimal(targetX);
 
@@ -621,17 +646,26 @@
       if (row < 1) row = 1;
       else if (row > lineCount) row = lineCount;
 
+      lineContent = ace.session.getLine(row - 1);
+      lineLength  = lineContent.length;
+
       // Parse the requested column.
-      if (targetX.indexOf('%') !== -1) {
+      if (targetX.length === 0) {
+        // If column is unspecified, jump to the end of the row.
+        column = lineLength;
+      }
+      else if (targetX.indexOf('%') !== -1) {
         percent = parseFloat(targetX) / 100;
-        lineLength = ace.session.getLine(row - 1).length;
         column = Math.round(lineLength * percent);
       } else {
         column = parseInt(targetX, 10);
       }
 
-      // If the column couldn't be parsed, default to 0.
-      if (isNaN(column)) column = 0;
+      // Make the column relative to the end.
+      if (relativeX) column = lineLength - column;
+
+      // If the column couldn't be parsed, default to the end of the line.
+      if (isNaN(column)) column = lineLength;
 
       // Go to the requested line and force an update.
       ace.gotoLine(row, column, false);
