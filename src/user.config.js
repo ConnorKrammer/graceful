@@ -248,7 +248,7 @@
       return deferred.promise;
     },
     focusFunc: function(editor) {
-      return editor.getFocusPane(); 
+      return editor.getFocusPane() || editor.panes[0]; 
     }
   });
 
