@@ -27,13 +27,12 @@
    * of the application, then notifies the application of
    * whether the command should proceed.
    *
-   * @param {String} id - The id of the command.
-   * @return {Boolean} True if the command should be cancelled at the
-   *                   application level.
+   * @param {String} name - The name of the command.
+   * @return {Boolean} True if the command should be cancelled by the shell.
    */
-  ShellAPI.executeCommand = function(id) {
-    var promise = CommandManager.execute(id);
-    return !(promise && promise.isRejected());
+  ShellAPI.executeCommand = function(name) {
+    var promise = CommandManager.runCommand(name);
+    return promise && promise.isRejected();
   };
 
 /* =======================================================
