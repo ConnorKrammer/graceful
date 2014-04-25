@@ -572,6 +572,7 @@ body {
 .link-container :last-child,
 .link-line-container .link-endpoint {
   font-size: 40px;
+  z-index: 2;
 }
 
 .link-line-container .link-endpoint {
@@ -601,12 +602,12 @@ body {
   height: 1em;
   border-radius: 1000px;
   background: rgb(250, 250, 250);
-  box-shadow: 0 0 0 2px rgba(0, 173, 255, 0.8);
-  transition-property: width, height, left, top, opacity;
-  transition-duration: 200ms;
-  transition-timing-function: ease-out;
+  border: 2px solid rgba(0, 173, 255, 0.8);
+  transition: width   300ms ease-out, height 300ms ease-out,
+              left    300ms ease-out, top    300ms ease-out,
+              opacity 150ms ease-out 50ms;
   opacity: 0;
-  z-index: -1;
+  z-index: 1;
 }
 
 .link-nexus.link-endpoint {
@@ -616,6 +617,9 @@ body {
 .link-nexus.visible {
   font-size: 100px;
   opacity: 1;
+  transition: width   300ms ease-out, height 300ms ease-out,
+              left    300ms ease-out, top    300ms ease-out,
+              opacity 100ms ease-out;
 }
 
 /* =======================================================

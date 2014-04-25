@@ -811,9 +811,9 @@
     this.nodes.nexus.classList.toggle('link-endpoint', isEndNode);
     this.nodes.nexus.classList.toggle('visible', isLinkNexus);
 
-    // Promote lines with link endpoint nodes to the top, so that they don't get
-    // overlapped by non-endpoint nodes.
-    this.containers.display.style.zIndex = isEndNode ? 1 : '';
+    // Increase the z-index of the line when hovering over an end point so that
+    // it's still on top of the nexus, which also gets promoted (see stylesheet).
+    if (this.hoverState.nexus) this.containers.display.style.zIndex = 3;
 
     // Set transition properties, and fade in the line.
     this.containers.display.style.transition = this.isShowingLink && transition
@@ -850,6 +850,7 @@
     // Place the destination on a ring around the target pane's center.
     if (this.pane.linkedPane && this.pane.linkedPane.linkManager.hoverState.nexus) {
       destination = getClosestCirclePoint(origin, destination, 50);
+      this.containers.display.style.zIndex = 2;
     }
 
     // Position the nexus at the start node position.
