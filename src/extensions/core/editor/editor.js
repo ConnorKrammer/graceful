@@ -1947,7 +1947,7 @@
       }
 
       // Refocus the focus pane.
-      if (focusPane) focusPane.focus();
+      if (focusPane && !focusPane.isFocused) focusPane.focus();
 
       // Remove the opening class.
       wrapper.classList.remove('opening');
