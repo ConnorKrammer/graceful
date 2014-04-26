@@ -23,7 +23,7 @@
    * Only supports UTF-8 encoding.
    *
    * @param {String} path - The path on disk to read from.
-   * @return {Promise} A promise for the contents of the file.
+   * @return {Q.Promise} A promise for the contents of the file.
    */
   FileSystem.readFile = function(path) {
     var deferred = Q.defer();
@@ -48,7 +48,7 @@
    *
    * @param {String} path - The path to write to.
    * @param {String} [data] - The data to write.
-   * @return {Promise} A promise for the operation's completion.
+   * @return {Q.Promise} A promise for the operation's completion.
    */
   FileSystem.writeFile = function(path, data) {
     var deferred = Q.defer();
@@ -73,7 +73,7 @@
    *
    * @param {String} path - The path to write to.
    * @param {String} [data] - The data to write.
-   * @return {Promise} A promise for the operation's completion.
+   * @return {Q.Promise} A promise for the operation's completion.
    */
   FileSystem.writeFileRecursive = function(path, data) {
     var deferred      = Q.defer();
@@ -105,7 +105,7 @@
    * as necessary.
    *
    * @param {String} path - The directory path to create.
-   * @return {Promise} A promise for the operation's completion.
+   * @return {Q.Promise} A promise for the operation's completion.
    */
   FileSystem.makeDirectory = function(path) {
     var deferred = Q.defer();
@@ -125,7 +125,7 @@
    * Checks if a file exists at the given location.
    *
    * @param {String} path - The path of the file to check.
-   * @return {Promise} A promise for whether the file exists.
+   * @return {Q.Promise} A promise for whether the file exists.
    */
   FileSystem.fileExists = function(path) {
     var deferred = Q.defer();
@@ -149,7 +149,7 @@
    * Checks if a directory exists at the given location.
    *
    * @param {String} path - The path of the directory to check.
-   * @return {Promise} A promise for whether the directory exists.
+   * @return {Q.Promise} A promise for whether the directory exists.
    */
   FileSystem.directoryExists = function(path) {
     var deferred = Q.defer();
@@ -176,7 +176,7 @@
    * true, then the path does not exist.
    *
    * @param {String} path - The path to check.
-   * @return {Promise} A promise for whether the path exists.
+   * @return {Q.Promise} A promise for whether the path exists.
    */
   FileSystem.pathExists = function(path) {
     var deferred = Q.defer();
@@ -203,7 +203,7 @@
    * directory, false if not to a real destination, or to an error.
    *
    * @param {String} path - The path to test.
-   * @return {Promise} A promise for the type of destination the path points to.
+   * @return {Q.Promise} A promise for the type of destination the path points to.
    */
   FileSystem.pathType = function(path) {
     var deferred = Q.defer();
@@ -239,7 +239,7 @@
    * Moves a file or directory to the trash folder. This allows non-permanent deletion.
    *
    * @param {String} path - The path of the file or directory to move to trash.
-   * @return {Promise} A promise for the operation's completion.
+   * @return {Q.Promise} A promise for the operation's completion.
    */
   FileSystem.moveToTrash = function(path) {
     var deferred = Q.defer();
@@ -259,7 +259,7 @@
    * Deletes a file or directory permanently.
    *
    * @param {String} path - The path of the file or directory to delete.
-   * @return {Promise} A promise for the operation's completion.
+   * @return {Q.Promise} A promise for the operation's completion.
    */
   FileSystem.unlink = function(path) {
     var deferred = Q.defer();
@@ -280,7 +280,7 @@
    *
    * @param {String} source - The path of the file or directory to copy.
    * @param {String} destination - The destination of the copied file.
-   * @return {Promise} A promise for the operation's completion.
+   * @return {Q.Promise} A promise for the operation's completion.
    */
   FileSystem.copyFile = function(source, destination) {
     var deferred = Q.defer();
@@ -305,7 +305,7 @@
    *
    * @param {String} path - The path of the file or directory to change permissions of.
    * @param {Integer} [mode=0777] - The permission level to set on the file, in base 8.
-   * @return {Promise} A promise for the operation's completion.
+   * @return {Q.Promise} A promise for the operation's completion.
    */
   FileSystem.chmod = function(path, mode) {
     var deferred = Q.defer();
@@ -326,7 +326,7 @@
    * Renames a file or directory.
    *
    * @param {String} path - The path of the file or directory to rename.
-   * @return {Promise} A promise for the operation's completion.
+   * @return {Q.Promise} A promise for the operation's completion.
    */
   FileSystem.rename = function(path, newPath) {
     var deferred = Q.defer();
@@ -352,12 +352,12 @@
    *        Setting this to null or '' will open the last chosen path.
    *
    * @param {String[]|String} [fileTypes] - A single file type or
-   *        array of file types to restrict the display to. When
+   *        array of file types to restrict the file list to. When
    *        specifying these, do not include the '.' character. For
    *        example, if you only want to display .js files, pass
    *        either 'js' or ['js'].
    *
-   * @return {Promise} A promise for the user selection.
+   * @return {Q.Promise} A promise for the user selection.
    */
   FileSystem.showOpenDialog = function(title, initialPath, fileTypes) {
     var deferred = Q.defer();
@@ -392,7 +392,7 @@
    * @param {String} [filename] - The initial name to set for the new file. This
    *        can be changed by the user in the dialogue window.
    *
-   * @return {Promise} A promise for the saved file's path.
+   * @return {Q.Promise} A promise for the saved file's path.
    */
   FileSystem.showSaveDialogue = function(title, initialPath, proposedName) {
     var deferred = Q.defer();

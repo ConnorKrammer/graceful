@@ -25,7 +25,7 @@
   /**
    * Loads saved preferences from file.
    *
-   * @return {Promise} A promise that the preferences have loaded.
+   * @return {Q.Promise} A promise that the preferences have loaded.
    */
   Preferences.load = function() {
     return FileSystem.fileExists(graceful.preferenceFile)

@@ -6,12 +6,12 @@
   'use strict';
 
   /**
-   * Link the current pane to the specified pane. (Determined by index.)
+   * Link the current pane to the pane with the given index.
    *
    * @todo Allow a more intuitive way to specify the linked pane.
    *
-   * @param {Integer|String) arg - The index of the pane to create the link with,
-   *                               or the keyword 'break'.
+   * @param {Integer|String) arg - The index of the pane to create the
+   *                         link with, or the keyword 'break'.
    */
   CommandManager.defineCommand({
     name: 'link',
@@ -94,7 +94,7 @@
    * @param {String} direction - The direction to make the split in.
    * @param {String} type - The type of pane to add.
    * @param {Boolean} link - Whether to link the new pane to the current one.
-   * @return {Promise} A promise that the added pane has finished its animation.
+   * @return {Q.Promise} A promise that the added pane has finished its animation.
    */
   function addSplitPane(pane, direction, type, link) {
     type = type ? type.toLowerCase() : '';
@@ -131,7 +131,7 @@
    *
    * @param {String} type - The type of pane to add.
    * @param {Boolean} link - Whether to link the new pane to the current one.
-   * @return {Promise} A promise that the added pane has finished its animation.
+   * @return {Q.Promise} A promise that the added pane has finished its animation.
    */
   CommandManager.defineCommand({
     name: 'split_h',
@@ -148,7 +148,7 @@
    *
    * @param {String} type - The type of pane to add.
    * @param {Boolean} link - Whether to link the new pane to the current one.
-   * @return {Promise} A promise that the added pane has finished its animation.
+   * @return {Q.Promise} A promise that the added pane has finished its animation.
    */
   CommandManager.defineCommand({
     name: 'split_v',
@@ -164,9 +164,9 @@
    * Toggles pane management mode, which allows the user to manipulate
    * pane links via the UI.
    *
-   * @param {String} [forcedState] - Whether to force the state on or off. (If the
-   *                                 desired state is already set, don't toggle it.)
-   * @return {Promise} A promise that the transition has finished.
+   * @param {String} [forcedState] - Turns management on/off if passed true/false,
+   *                 otherwise toggles management mode like normal.
+   * @return {Q.Promise} A promise that the transition has finished.
    */
   CommandManager.defineCommand({
     name: 'manage',
@@ -230,7 +230,7 @@
    * Closes the specified panes, or the focused pane if none are specified.
    *
    * @param {Integer[]|String} panes - The indices of the panes to remove, or the keyword 'all'.
-   * @return {Promise} A promise that the panes have finished being removed.
+   * @return {Q.Promise} A promise that the panes have finished being removed.
    */
   CommandManager.defineCommand({
     name: 'close',
@@ -305,9 +305,9 @@
    *
    * @param {String} currentPath - The current path.
    * @param {String} path - The relative path.
-   * @param {Boolean} [fallback=false] - Whether to return the current path's directory
-   *        if the path argument is invalid.
-   * @return {String|False} The new, absolute path, or false if not possible.
+   * @param {Boolean} [fallback=false] - Whether to return the current path's
+   *                  directory if the path argument is invalid.
+   * @return {String|false} The new, absolute path, or false if not possible.
    */
   function getAbsolutePath(currentPath, path, fallback) {
     var firstThreeChars, firstTwoChars, index;
@@ -356,13 +356,11 @@
    *       When the python API is implemented it will allow a simple method
    *       of checking for absolute filepaths.
    *
-   * @param {Editor.Pane} pane - The pane to open the file in.
    * @param {String} path - The path to open. If not specified,
-   *        the user will be prompted to choose a destination. If
-   *        the buffer has a filepath associated with it, the path
-   *        will default to that.
-   *
-   * @return {Promise} A promise for the open operation.
+   *                 the user will be prompted to choose a destination. If
+   *                 the buffer has a filepath associated with it, the path
+   *                 will default to that.
+   * @return {Q.Promise} A promise for the open operation.
    */
   CommandManager.defineCommand({
     name: 'open',
@@ -421,13 +419,11 @@
    * @todo When recursively creating a new directory, only the end directory
    *       is deleted again when cancelling. All created directories should be.
    *
-   * @param {Editor.Pane} pane - The pane to open the file in.
    * @param {String} path - The path to save to. If not specified,
-   *        the user will be prompted to choose a destination. If
-   *        the buffer has a filepath associated with it, the path
-   *        will default to that.
-   *
-   * @return {Promise} A promise for the save operation.
+   *                 the user will be prompted to choose a destination. If
+   *                 the buffer has a filepath associated with it, the path
+   *                 will default to that.
+   * @return {Q.Promise} A promise for the save operation.
    */
   CommandManager.defineCommand({
     name: 'save',
@@ -506,7 +502,7 @@
    * Starts a 'ripple' animation around the cursor to help the user find it.
    *
    * @param {Editor.InputPane} pane - The pane to add the animation to.
-   * @return {Promise} A promise for the animation's completion.
+   * @return {Q.Promise} A promise for the animation's completion.
    */
   function pingCursor(pane) {
     var deferred = Q.defer();
@@ -548,7 +544,7 @@
    * Starts a 'ripple' animation around the cursor to help the user find it.
    *
    * @param {Editor.InputPane} pane - The pane to add the animation to.
-   * @return {Promise} A promise for the animation's completion.
+   * @return {Q.Promise} A promise for the animation's completion.
    */
   CommandManager.defineCommand({
     name: 'ping',
@@ -624,7 +620,6 @@
    *
    * @todo Allow jumping to set positions, headers, or regex searches.
    *
-   * @param {Editor.InputPane} pane - The pane to jump to the position in.
    * @param {String|Number} positionY - The row or vertical percent position to jump to.
    * @param {String|Number} positionX - The column or horizontal percent position to jump to.
    */
@@ -632,7 +627,7 @@
     name: 'jump',
     template: '{positionX} {positionY}',
     argCount: 2,
-    func: function(pane, positionY, positionX) {
+    func: function(positionY, positionX) {
       var pane = graceful.editor.focusPane();
       var ace, lineCount, currentRow, relativeY, relativeX, percent,
         lineContent, lineLength, row, column;

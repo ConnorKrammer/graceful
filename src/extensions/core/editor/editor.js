@@ -323,7 +323,7 @@
    * Finds a buffer with the given filepath.
    *
    * @param {String} filepath - The filepath to match against.
-   * @return {Buffer|False} The matching buffer, or false.
+   * @return {Buffer|false} The matching buffer, or false.
    */
   BufferList.prototype.find = function(filepath) {
     return _.find(this.buffers, { filepath: filepath }) || false;
@@ -345,7 +345,7 @@
    * Returns all buffers that have been marked as dirty, or
    * false if all buffers are clean.
    *
-   * @return {Buffer[]|False} An array of dirty buffers, or false.
+   * @return {Buffer[]|false} An array of dirty buffers, or false.
    */
   BufferList.prototype.getDirty = function() {
     return _.filter(this.buffers, { dirty: true }) || false;
@@ -774,7 +774,7 @@
    * Draws a link line between the status light and the center of the linked pane.
    * Utilizes drawLine().
    *
-   * @param {Boolean} [recursive=true]  - Whether to show links recursively.
+   * @param {Boolean} [recursive=true] - Whether to show links recursively.
    * @param {Boolean} [transition=true] - Whether to transition changes.
    * @param {Boolean} [animateEnd=true] - Whether to add the 'bounce' effect to the end node, if applicable.
    */
@@ -877,7 +877,7 @@
   /**
    * Fades out the link line added in showLink().
    *
-   * @param {Boolean} [recursive=true] If true, shows links recursively.
+   * @param {Boolean} [recursive=true] - If true, shows links recursively.
    * @param {Boolean} [fadeOut=true] - Whether to transition changes.
    */
   LinkManager.prototype.hideLink = function(recursive, fadeOut) {
@@ -939,11 +939,9 @@
    * Resizes and rotates an element so that it stretches between the specified points.
    *
    * @param {Element} line - The element to use.
-   *
    * @param {Object} origin - The start point of the line in screen coordinates.
    * @param {Number} origin.x - The x position of the origin.
    * @param {Number} origin.y - The y position of the origin.
-   *
    * @param {Object} destination - The end point of the line in screen coordinates.
    * @param {Number} destination.x - The x position of the destination.
    * @param {Number} destination.y - The y position of the destination.
@@ -1010,7 +1008,7 @@
    * Updates all shown links on panes directly connected to the given pane.
    *
    * @param {Pane} pane - The pane to update. Connected panes will have
-   *        their links updated as well.
+   *                      their links updated as well.
    * @param {Boolean} [transition=true] - Whether to transition changes.
    * @param {Boolean} [updateLinking=true] - Whether to update linking panes as well.
    */
@@ -1043,7 +1041,6 @@
    * @param {Number} origin.x - The x position of the origin.
    * @param {Number} origin.y - The y position of the origin.
    * @param {Number} radius   - The radius of the circle.
-   *
    * @return {Boolean} True if the point is within the circle.
    */
   function pointInCircle(point, origin, radius) {
@@ -1063,7 +1060,6 @@
    * @param {Number} origin.x - The x position of the origin.
    * @param {Number} origin.y - The y position of the origin.
    * @param {Number} radius   - The radius of the circle.
-   *
    * @return {Object} The nearest point lying on the circle.
    */
   function getClosestCirclePoint(point, origin, radius) {
@@ -1097,10 +1093,10 @@
    *       subclasses, where that argument is omitted.
    *
    * @constructor
-   * @param {Editor} editor - The editor that the pane belongs to.
-   * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
-   * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
-   * @param {String} [type='base'] - The type of pane. Parameter only used by subclasses.
+   * @param {Editor}  editor    - The editor that the pane belongs to.
+   * @param {Buffer}  [buffer]  - The buffer to start with.
+   * @param {Element} [wrapper] - The element to wrap the pane in.
+   * @param {String}  [type='base'] - The type of pane. Parameter only used by subclasses.
    */
   function Pane(editor, buffer, wrapper, type) {
     var _this = this;
@@ -1331,7 +1327,7 @@
    * This means that both panes will share their contents, even if one of them switches
    * to a different buffer.
    *
-   * @param {Pane|Falsey} pane - The pane to link to. Passing a falsey value will remove all links.
+   * @param {Pane|falsey} pane - The pane to link to. Passing a falsey value will remove all links.
    * @param {Boolean} [keepBuffer=false] - Whether to keep the current buffer in the pane, assuming
    *                                       that the pane parameter recieved a falsey argument.
    * @return {Boolean} False if a circular reference would be created, otherwise true.
@@ -1479,10 +1475,10 @@
    * Input panes allow the user to type into a buffer.
    *
    * @constructor
-   * @param {Editor} editor - The editor that the pane belongs to.
-   * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
-   * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
-   * @param {Object} [options] - A set of options that will override user-set preferences.
+   * @param {Editor}  editor    - The editor that the pane belongs to.
+   * @param {Buffer}  [buffer]  - The buffer to start with.
+   * @param {Element} [wrapper] - The element to wrap the pane in.
+   * @param {Object}  [options] - A set of options that will override user-set preferences.
    */
   function InputPane(editor, buffer, wrapper, options) {
     var _this = this;
@@ -1677,7 +1673,7 @@
    * Returns the function associated with a mode.
    *
    * @param {String} name - The name of the mode.
-   * @return {Function|False} The parsing function, or false if the mode is not defined.
+   * @return {Function|false} The parsing function, or false if the mode is not defined.
    */
   PreviewPane.getMode = function(name) {
     return (typeof this.modes[name] !== 'undefined') ? this.modes[name] : false;
@@ -1693,10 +1689,10 @@
    * Preview panes are used to parse and display buffer contents.
    *
    * @constructor
-   * @param {Editor} editor - The editor that the pane belongs to.
-   * @param {Buffer} [buffer=new Buffer()] - The buffer to start with.
-   * @param {Element} [wrapper=document.createElement('div')] - The element to wrap the pane in.
-   * @param {Object} [options] - A set of options that will override user-set preferences.
+   * @param {Editor}  editor    - The editor that the pane belongs to.
+   * @param {Buffer}  [buffer]  - The buffer to start with.
+   * @param {Element} [wrapper] - The element to wrap the pane in.
+   * @param {Object}  [options] - A set of options that will override user-set preferences.
    */
   function PreviewPane(editor, buffer, wrapper, options) {
     // The preview function.
@@ -1837,11 +1833,10 @@
    * @param {Function} constructor - The constructor of the pane type to add.
    * @param {Array} args - An array of arguments, to be passed in order to the constructor.
    * @param {String} type - The orientation of the pane. Passing 'vertical' will
-   *        create the split vertically, while 'horizontal' splits it in the horizontal
-   *        direction.
+   *                        create the split vertically, while 'horizontal' splits it in
+   *                        the horizontal direction.
    * @param {Pane} [parentPane] - A pane to add the new pane relative to.
-   * @param {Boolean} [isInstant=false] - Whether or not the addition should be
-   *        instant (have no transition).
+   * @param {Boolean} [isInstant=false] - Whether or not the addition should be instant.
    * @return {Pane} The newly added pane.
    */
   Editor.prototype.addPane = function(constructor, args, type, parentPane, isInstant) {
@@ -2303,7 +2298,7 @@
   /**
    * Returns the focused pane.
    *
-   * @return {Pane|false} The focused pane, or false if no pane is focused.
+   * @return {Pane|false} The focused pane, or false if no pane has focus.
    */
   Editor.prototype.getFocusPane = function() {
     return _.find(this.panes, 'isFocused') || false;
@@ -2349,8 +2344,8 @@
    * Returns the pane with the specified element as a wrapper.
    *
    * @param {Element} element - The wrapper element to find the pane of.
-   * @return {Pane|False} The pane with the given wrapper, or false if no
-   *         pane has the wrapper specified.
+   * @return {Pane|false} The pane with the given wrapper, or false if no
+   *                      pane has the wrapper specified.
    */
   Editor.prototype.getPaneByElement = function(element) {
     return _.find(this.panes, function(pane) {
@@ -2364,7 +2359,7 @@
    * @param {Object} point - The position to check for a pane.
    * @param {Number} point.x - The horizontal position to check.
    * @param {Number} point.y - The vertical position to check.
-   * @return {Pane|False} The pane at the given position, or false if none exists.
+   * @return {Pane|false} The pane at the given position, or false if none exists.
    */
   Editor.prototype.getPaneAtCoordinate = function(point) {
     var target = document.elementFromPoint(point.x, point.y);
@@ -2464,8 +2459,8 @@
    *
    * @param {Element} element - The element to start with.
    * @param {String} className - The class to check for.
-   * @return {Element|False} The ancestor with the given class, or
-   *         false if not found.
+   * @return {Element|false} The ancestor with the given class, or
+   *                         false if not found.
    */
   function ancestorWithClass(element, className) {
     if (element.classList && element.classList.contains(className)) return element;

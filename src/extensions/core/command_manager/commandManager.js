@@ -11,7 +11,7 @@
 !function(global) {
   'use strict';
 
-  /*
+  /**
    * Matches command template arguments.
    *
    *   {             - match the starting brace
@@ -27,7 +27,7 @@
    */
   var templateArgumentRegex = /{(?:\.\.\.)?\w+\??(?::[\w<>]+)?}/g;
 
-  /*
+  /**
    * Used for building template regexes. It holds a
    * number of regex building blocks (as strings) that
    * when used to form a regex will match for a given
@@ -45,7 +45,7 @@
     boolean: '[\\w]+?' // Matches single words - boolean type is enforced at typecast.
   };
 
-  /*
+  /**
    * Okay, this is a bit of a monster:
    *
    *  \[                - match the opening square bracket
@@ -74,7 +74,7 @@
    */
   regexTable.array = '\\[\\s*(?:(?:(?:".+?"|\'.+?\'|[^\'"\\[\\],\\s]+?)|(?:[\\d.]+?))(?:\\s*,\\s*))*?(?:(?:".+"|\'.+\'|[^\'"\\[\\],\\s]+)|(?:[\\d.]+))\\s*\\]';
 
-  /*
+  /**
    * The next two are similar to the above, but only allow a single type
    * inside the array.
    */
@@ -98,7 +98,7 @@
    *
    * @param {String} input - The input string.
    * @param {String} type - The type to cast the input to.
-   * @return {*} The newly cast value.
+   * @return {*} The newly cast value, or null on failure.
    */
   function typecast(input, type) {
     if (typeof input === 'undefined') return;
@@ -165,9 +165,8 @@
   /**
    * Throws an error.
    *
-   * Used by CommandManager.parseCommand() to construct a Command
-   * object that fails in a manner expected by CommandManager.runCommand(),
-   * for cases where the supplied string can't be parsed.
+   * Used by getFailCommand() to construct a Command object that
+   * fails in a manner expected by CommandManager.runCommand().
    *
    * @param {String} message - The error message.
    */
@@ -176,7 +175,11 @@
   }
 
   /**
+   * Creates a command that throws an error with the specified message.
    *
+   * @param {String} commandName - The name of the command.
+   * @param {String} message - The error message.
+   * @return {Command} The constructed command.
    */
   function getFailCommand(commandName, message) {
     return {

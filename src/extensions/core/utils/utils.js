@@ -23,8 +23,8 @@
   /**
    * Maps appshell errors codes to more descriptive error messages.
    *
-   * @param {integer} errorCode - The error code returned.
-   * @return {string} A message describing the error code.
+   * @param {Integer} errorCode - The error code returned.
+   * @return {String} A message describing the error code.
    */
   Utils.getShellErrorMessage = function(errorCode) {
     switch (errorCode) {

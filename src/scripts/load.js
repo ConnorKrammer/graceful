@@ -118,7 +118,7 @@
    * Can only be called after the Q library has loaded.
    *
    * @param {String|String[]} files - The files to load.
-   * @return {Promise} A promise that the files were loaded.
+   * @return {Q.Promise} A promise that the files were loaded.
    */
   function loadAsync(files) {
     var deferred = Q.defer();
@@ -151,7 +151,7 @@
    * @param {Object[]} collection - A collection of file/function pairs.
    * @param {String[]} collection.files - The files to iterate over.
    * @param {Function} [collection.func] - A promise-returning callback.
-   * @return {Promise} A promise that the files were loaded.
+   * @return {Q.Promise} A promise that the files were loaded.
    */
   function loadAndWait(collection) {
     var stored, chain, next;
@@ -162,7 +162,7 @@
      *
      * @param {String|String[]} files - The files to load.
      * @param {Function} func - A function to execute after load.
-     * @return {Promise} A promise that the files were loaded.
+     * @return {Q.Promise} A promise that the files were loaded.
      */
     function load(files, func) {
       return loadAsync(files).then(func);

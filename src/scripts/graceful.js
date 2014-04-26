@@ -19,7 +19,7 @@
    * This is the main application object.
    *
    * @constructor
-   * @return {object} The constructed Graceful instance.
+   * @return {Object} The constructed Graceful instance.
    */
   function Graceful() {
     var _this = this;
