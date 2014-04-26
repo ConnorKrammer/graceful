@@ -100,11 +100,12 @@
   padding: 0 15px;
 }
 
-/* ============ Type-specific Pane Styles ============ */
+/* =======================================================
+ *                      Input Pane
+ * ======================================================= */
 
-/* Font options are set in user preferences.
- * For defaults, see editor.js or check out
- * the preference file. */
+/* Font options are set in user preferences, based upon filetype.
+ * For defaults, see editor.js or check out the preference file. */
 .pane.input .input-area {
   position: relative;
   width: 100%;
@@ -116,6 +117,10 @@
 .pane.input .input-area.filetype-mkd {
   max-width: 800px;
 }
+
+/* =======================================================
+ *                       Preview Pane
+ * ======================================================= */
 
 .pane.preview .preview-area {
   height: 100%;
