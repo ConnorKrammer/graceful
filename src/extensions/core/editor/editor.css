@@ -2,27 +2,8 @@
  *                        General
  * ======================================================= */
 
-html, body {
-  overflow: hidden;
-  background: rgb(250, 250, 250);
-}
-
-body {
-  height: 100%;
-  width: 100%;
-}
-
 .disable-transition {
   transition: none !important;
-}
-
-:focus {
-  outline-color: transparent;
-  outline-style: none;
-}
-
-::-webkit-scrollbar { 
-  display: none;
 }
 
 /* =======================================================
