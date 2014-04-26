@@ -314,9 +314,11 @@ body {
 
 .title-bar .title {
   position: absolute;
-  width: 100%;
+  left: 61px; /* Link bar width + 5px. */
+  width: -webkit-calc(100% - (56px * 2) - 10px); /* 56px is the link bar width. */
+  text-overflow: ellipsis;
+  overflow: hidden;
   font-size: 17px;
-  line-height: 1.6;
   font-family: Cousine;
   line-height: 24px;
   text-align: center;
