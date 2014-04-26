@@ -1881,9 +1881,11 @@
     }
 
     // Don't allow too many panes.
-    // The addition is to account for splitters.
-    if ((type === 'vertical' && container.children.length >= 5 + 4) ||
-        (type === 'horizontal' && container.children.length >= 3 + 2)) {
+    // The "* 2 - 1" is to account for splitters.
+    var maxVertical   = (Preferences.get(prefKeys.panes + '.maxVertical') * 2) - 1;
+    var maxHorizontal = (Preferences.get(prefKeys.panes + '.maxHorizontal') * 2) - 1;
+    if ((type === 'vertical'   && container.children.length >= maxVertical) ||
+        (type === 'horizontal' && container.children.length >= maxHorizontal)) {
       return false;
     }
 
@@ -2074,7 +2076,7 @@
 
     if (type === 'horizontal') {
       dragHandler = function(event) {
-        var prevWidth, nextWidth, totalWidth, minWidth, parentWidth;
+        var totalWidth, parentWidth, prevWidth, nextWidth, maxHorizontalSplits, minWidth;
 
         // Do nothing if this isn't a drag.
         if (!isDrag) return; 
@@ -2094,7 +2096,8 @@
         nextWidth = next.offsetWidth + deltaX;
 
         // The minimum width.
-        minWidth = parentWidth / 5;
+        maxHorizontalSplits = Preferences.get(prefKeys.panes + '.maxHorizontal');
+        minWidth = parentWidth / (maxHorizontalSplits * 2);
 
         // Don't allow the dimensions to break the min.
         if (prevWidth < minWidth) {
@@ -2102,9 +2105,7 @@
           prevWidth = minWidth;
           nextWidth = totalWidth - prevWidth;
         }
-
-        // Don't allow the dimensions to break the min.
-        if (nextWidth < minWidth) {
+        else if (nextWidth < minWidth) {
           lastX -= Math.round(minWidth - nextWidth);
           nextWidth = minWidth;
           prevWidth = totalWidth - nextWidth;
@@ -2130,7 +2131,7 @@
     }
     else if (type === 'vertical') {
       dragHandler = function(event) {
-        var prevHeight, nextHeight, totalHeight, minHeight, parentHeight;
+        var totalHeight, parentHeight, prevHeight, nextHeight, maxVerticalSplits, minHeight;
 
         // Do nothing if this isn't a drag.
         if (!isDrag) return; 
@@ -2150,7 +2151,8 @@
         nextHeight = next.offsetHeight + deltaY;
 
         // Minimum height.
-        minHeight = parentHeight / 10;
+        maxVerticalSplits = Preferences.get(prefKeys.panes + '.maxVertical');
+        minHeight = parentHeight / (maxVerticalSplits * 2);
 
         // Don't allow the dimensions to break the min.
         if (prevHeight < minHeight) {
@@ -2158,9 +2160,7 @@
           prevHeight = minHeight;
           nextHeight = totalHeight - prevHeight;
         }
-
-        // Don't allow the dimensions to break the min.
-        if (nextHeight < minHeight) {
+        else if (nextHeight < minHeight) {
           lastY -= Math.round(minHeight - nextHeight);
           nextHeight = minHeight;
           prevHeight = totalHeight - nextHeight;
@@ -2682,15 +2682,17 @@
   // Preference keys.
   var prefKeys = {
     root:            'extensions.editor',
+    panes:           'extensions.editor.panes',
     filetypes:       'extensions.editor.filetypes',
-    defaultFiletype: 'extensions.editor.filetypes.plaintext',
-    subKeys: {
-      input:   'input',
-      preview: 'preview',
-    }
+    defaultFiletype: 'extensions.editor.filetypes.plaintext'
   };
 
-  Preferences.default(prefKeys.defaultFiletype, {
+  Preferences.set(prefKeys.panes, {
+    maxHorizontal: 3,
+    maxVertical: 4
+  });
+
+  Preferences.set(prefKeys.defaultFiletype, {
     input: {
       animatedScroll:        false,
       behavioursEnabled:     true,
@@ -2728,7 +2730,7 @@
     }
   });
 
-  Preferences.default(prefKeys.filetypes + '.js', {
+  Preferences.set(prefKeys.filetypes + '.js', {
     input: {
       mode: 'ace/mode/javascript',
       fontFamily: 'Consolas',
@@ -2736,7 +2738,7 @@
     }
   });
 
-  Preferences.default(prefKeys.filetypes + '.mkd', {
+  Preferences.set(prefKeys.filetypes + '.mkd', {
     input: {
       mode: 'ace/mode/markdown',
       showGutter:          false,
