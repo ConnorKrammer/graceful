@@ -625,7 +625,7 @@
    */
   CommandManager.defineCommand({
     name: 'jump',
-    template: '{positionX} {positionY}',
+    template: '{positionY} {positionX?}',
     argCount: 2,
     func: function(positionY, positionX) {
       var pane = graceful.editor.focusPane();
