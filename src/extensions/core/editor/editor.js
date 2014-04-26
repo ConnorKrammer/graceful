@@ -2074,8 +2074,7 @@
 
     if (type === 'horizontal') {
       dragHandler = function(event) {
-        var prevWidth, prevMinWidth, prevMaxWidth,
-          nextWidth, nextMinWidth, nextMaxWidth, totalWidth, parentWidth;
+        var prevWidth, nextWidth, totalWidth, minWidth, parentWidth;
 
         // Do nothing if this isn't a drag.
         if (!isDrag) return; 
@@ -2094,15 +2093,20 @@
         prevWidth = prev.offsetWidth - deltaX;
         nextWidth = next.offsetWidth + deltaX;
 
+        // The minimum width.
+        minWidth = parentWidth / 5;
+
         // Don't allow the dimensions to break the min.
-        if (prevWidth < parentWidth / 5) {
-          prevWidth = prevMinWidth;
+        if (prevWidth < minWidth) {
+          lastX += Math.round(minWidth - prevWidth);
+          prevWidth = minWidth;
           nextWidth = totalWidth - prevWidth;
         }
 
         // Don't allow the dimensions to break the min.
-        if (nextWidth < parentWidth / 5) {
-          nextWidth = nextMinWidth;
+        if (nextWidth < minWidth) {
+          lastX -= Math.round(minWidth - nextWidth);
+          nextWidth = minWidth;
           prevWidth = totalWidth - nextWidth;
         }
 
@@ -2122,15 +2126,11 @@
         _.forEach(resizePanes, function(pane) {
           pane.trigger('resize');
         });
-
-        // Use a resize cursor for the duration of the drag.
-        document.body.style.cursor = 'e-resize';
       };
     }
     else if (type === 'vertical') {
       dragHandler = function(event) {
-        var prevHeight, prevMinHeight, prevMaxHeight,
-          nextHeight, nextMinHeight, nextMaxHeight, totalHeight, parentHeight;
+        var prevHeight, nextHeight, totalHeight, minHeight, parentHeight;
 
         // Do nothing if this isn't a drag.
         if (!isDrag) return; 
@@ -2149,15 +2149,20 @@
         prevHeight = prev.offsetHeight - deltaY;
         nextHeight = next.offsetHeight + deltaY;
 
+        // Minimum height.
+        minHeight = parentHeight / 10;
+
         // Don't allow the dimensions to break the min.
-        if (prevHeight < parentHeight / 10) {
-          prevHeight = prevMinHeight;
+        if (prevHeight < minHeight) {
+          lastY += Math.round(minHeight - prevHeight);
+          prevHeight = minHeight;
           nextHeight = totalHeight - prevHeight;
         }
 
         // Don't allow the dimensions to break the min.
-        if (nextHeight < parentHeight / 10) {
-          nextHeight = nextMinHeight;
+        if (nextHeight < minHeight) {
+          lastY -= Math.round(minHeight - nextHeight);
+          nextHeight = minHeight;
           prevHeight = totalHeight - nextHeight;
         }
 
@@ -2177,9 +2182,6 @@
         _.forEach(resizePanes, function(pane) {
           pane.trigger('resize');
         });
-
-        // Use a resize cursor for the duration of the drag.
-        document.body.style.cursor = 'n-resize';
       };
     }
 
@@ -2230,6 +2232,17 @@
       prev.classList.add('disable-transition');
       next.classList.add('disable-transition');
 
+      // Allow styling based on resize state.
+      if (type === 'horizontal') {
+        prev.classList.add('resize', 'resize-x');
+        next.classList.add('resize', 'resize-x');
+        _this.container.classList.add('resize', 'resize-x');
+      } else {
+        prev.classList.add('resize', 'resize-y');
+        next.classList.add('resize', 'resize-y');
+        _this.container.classList.add('resize', 'resize-y');
+      }
+
       // Add the drag handler.
       document.addEventListener('mousemove', dragHandler);
     });
@@ -2239,13 +2252,17 @@
       // Reset not needed if a drag wasn't triggered.
       if (!isDrag) return;
 
-      // Reset drag and cursor state.
-      document.body.style.cursor = '';
+      // Reset drag state.
       isDrag = false;
       
       // Re-enable transitions.
       prev.classList.remove('disable-transition');
       next.classList.remove('disable-transition');
+
+      // Allow styling based on resize state.
+      prev.classList.remove('resize', 'resize-x', 'resize-y');
+      next.classList.remove('resize', 'resize-x', 'resize-y');
+      _this.container.classList.remove('resize', 'resize-x', 'resize-y');
 
       // Remove the drag handler.
       document.removeEventListener('mousemove', dragHandler);

@@ -282,6 +282,18 @@ body {
   z-index: 2;
 }
 
+/* When resizing, keep the resize cursor even if
+ * the mouse wanders off the splitter a little. */
+#editor.resize-x,
+#editor.resize-x * {
+  cursor: e-resize !important;
+}
+
+#editor.resize-y,
+#editor.resize-y * {
+  cursor: n-resize !important;
+}
+
 /* =======================================================
  *                        Title Bar
  *
