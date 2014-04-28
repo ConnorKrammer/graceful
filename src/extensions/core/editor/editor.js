@@ -118,7 +118,8 @@
     if (!filepath) {
       this.title = this.id > 0 ? 'new_' + this.id : 'new';
       this.filepath = null;
-      this.filetype = 'plaintext';
+      this.filetype = Preferences.get(prefKeys.panes + '.defaultExtension');
+      this.title += this.filetype;
     } else {
       this.setFilepath(filepath);
     }
@@ -178,7 +179,7 @@
       index    = filepath.lastIndexOf('.');
       filetype = filepath.substr(index + 1);
     } else {
-      filetype = 'plaintext';
+      filetype = 'default';
     }
 
     // Set the new filepath, filetype, and title.
@@ -1561,6 +1562,8 @@
    * @param {String} filetype - The filetype to get the mode of.
    */
   InputPane.prototype.setMode = function(filetype) {
+    if (filetype[0] === '.') filetype = filetype.slice(1);
+
     var prefKey      = prefKeys.filetypes + '.' + filetype + '.input';
     var filePrefs    = Preferences.get(prefKey);
     var defaultPrefs = Preferences.get(prefKeys.defaultFiletype + '.input');
@@ -2856,14 +2859,15 @@
     root:            'extensions.editor',
     panes:           'extensions.editor.panes',
     filetypes:       'extensions.editor.filetypes',
-    defaultFiletype: 'extensions.editor.filetypes.plaintext'
+    defaultFiletype: 'extensions.editor.filetypes.default'
   };
 
   Preferences.set(prefKeys.panes, {
     maxHorizontal: 3,
     maxVertical: 4,
     animateOpen: true,
-    animateClose: true
+    animateClose: true,
+    defaultExtension: '.mkd'
   });
 
   Preferences.set(prefKeys.defaultFiletype, {
