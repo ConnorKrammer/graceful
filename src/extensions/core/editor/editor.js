@@ -1621,6 +1621,9 @@
       this.inputWrapper.classList.toggle('centered-cursors', lineHeight / fontSize > 1.2);
     }
 
+    // Resize the editor in case the style was changed.
+    this.ace.resize();
+
     // Notify listeners about the change.
     this.trigger('change.mode');
   };
