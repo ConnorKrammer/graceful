@@ -2,7 +2,8 @@
  *                        General
  * ======================================================= */
 
-.disable-transition {
+.disable-transition,
+.disable-transition * {
   transition: none !important;
 }
 
@@ -15,10 +16,26 @@
 
 #editor {
   position: relative;
+  display: flex;
   white-space: nowrap;
   height: 100%;
   width: 100%;
   overflow: hidden;
+  -webkit-transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
+}
+
+/* When resizing, keep the resize cursor enabled even if
+ * the mouse wanders off the splitter a little. */
+#editor.resize-x,
+#editor.resize-x * {
+  cursor: e-resize !important;
+}
+
+#editor.resize-y,
+#editor.resize-y * {
+  cursor: n-resize !important;
 }
 
 /* =======================================================
@@ -26,26 +43,18 @@
  *
  * Panes hold content of various types within the editor
  * (mostly text), and more than one can be open at a time.
- * If more than one pane is open at once, then each pane
- * will be divided by a splitter element.
+ * Panes are divided by splitter elements, which allow
+ * then to be resized.
  *
- * Because panes use percentage width/heights, surrounding
- * elements are offset into borders which are incorporated
- * into the pane's size using box-sizing: border-box. This
- * preserves full fluidity, with the downside that it is
- * less semantic and trickier to modify. Flexbox would be
- * a good alternative, but seems not to play nicely with
- * CodeMirror.
- *
- *                         - - - 
- *
- * NOTE: Panes are the most interacted with of any element
- * in the application. As such, the UI should be fluid and
- * stay out of the user's way.
+ * NOTE: Panes are the most interacted-with element in the
+ * application. It is especially important that they
+ * remain fluid and jank-free.
  * ======================================================= */
 
 .pane {
   position: relative;
+  display: flex;
+  flex-flow: column;
   width: 100%;
   height: 100%;
   border-width: 0;
@@ -53,51 +62,16 @@
   border-color: transparent;
   background: rgb(250, 250, 250);
   -webkit-user-select: none;
-  -webkit-transform: translate3d(0, 0, 0);
-  -webkit-backface-visibility: hidden;
-  -webkit-perspective: 1000;
 }
 
 #editor > .pane {
-  position: relative;
-  display: inline-block;
-  vertical-align: top;
-  box-sizing: border-box;
-  background: rgb(250, 250, 250);
-  outline: 0;
-}
-
-/* Create room for horizontal splitters. */
-#editor > .pane:not(:last-child) {
-  border-right-width: 5px;
-}
-
-/* Create room for vertical splitters. */
-.vertical-splitter-pane > .pane:not(:last-child) {
-  border-bottom-width: 6px;
+  transition: width   500ms cubic-bezier(0.3, 0.4, 0.3, 1),
+              opacity 300ms ease-in;
 }
 
 .vertical-splitter-pane > .pane {
-  position: relative;
-  box-sizing: border-box;
-}
-
-/* Create room for the info bar. */
-#editor > .pane:not(.vertical-splitter-pane),
-#editor > .pane:not(.vertical-splitter-pane) .pane-overlay,
-.vertical-splitter-pane > .pane,
-.vertical-splitter-pane > .pane .pane-overlay {
-  border-top-width: 29px;
-}
-
-/* Create room for the info bar. */
-.vertical-splitter-pane .pane ~ .pane,
-.vertical-splitter-pane .pane ~ .pane .pane-overlay {
-  border-top-width: 24px;
-}
-
-.pane:not(.vertical-splitter-pane) > :first-child {
-  padding: 0 15px;
+  transition: height  500ms cubic-bezier(0.3, 0.4, 0.3, 1),
+              opacity 300ms ease-in;
 }
 
 /* =======================================================
@@ -112,6 +86,7 @@
   height: 100%;
   margin: 0 auto;
   background: none;
+  z-index: 0;
 }
 
 .pane.input .input-area.filetype-mkd {
@@ -140,30 +115,23 @@
 
 .pane-overlay {
   position: absolute;
-  width: 100%;
-  height: 100%;
+  top: 0;
   bottom: 0;
   left: 0;
-  border-width: 0;
-  border-style: solid;
-  border-color: rgb(250, 250, 250);
-  background: rgb(250, 250, 250);
+  right: 0;
   opacity: 0;
-  z-index: 4;
-  box-sizing: content-box;
+  background: rgb(250, 250, 250);
   transition: opacity 400ms ease;
   pointer-events: none;
-  -webkit-transform: translate3d(0,0,0);
-  -webkit-backface-visibility: hidden;
-  -webkit-perspective: 1000;
+  z-index: 4;
 }
 
-.pane.opening .pane-overlay {
+.pane.opening:not(.resize-instant) .pane-overlay {
   transition: none;
   opacity: 1;
 }
 
-.showing-link .pane-overlay {
+.managing-links .pane-overlay {
   opacity: 0.95;
   pointer-events: auto;
 }
@@ -174,10 +142,6 @@
  * The command bar exists at the bottom of a pane, and is
  * there to accept user input (commands). It is not
  * persistant, and only exists when the user toggle it.
- *
- * It is shifted to the left by 5px in some cases to make
- * it line up with the edge of the adjacent pane (to make
- * up for the splitter offset).
  * ======================================================= */
 
 .command-bar {
@@ -187,9 +151,7 @@
   right: 0;
   min-height: 1.6em;
   padding: 2px 5px 2px 25px;
-  border-width: 5px 0 0 0;
-  border-style: solid;
-  border-color: #000;
+  border-top: 5px solid #000;
   outline: none;
   font-size: 20px;
   font-family: Consolas;
@@ -197,6 +159,10 @@
   line-height: 1.6;
   white-space: normal;
   background: rgb(250, 250, 250);
+  z-index: 1;
+}
+
+.managing-links .command-bar {
   z-index: 4;
 }
 
@@ -209,7 +175,7 @@
   left: 5px;
 }
 
-/* Shift it over to compensate for horizontal splitter. */
+/* Shift it over to align with horizontal splitter. */
 #editor > .pane:not(:first-child) .command-bar {
   left: -5px;
 }
@@ -243,41 +209,23 @@
 .splitter-horizontal {
   width: 5px;
   height: 100%;
-  margin-left: -5px;
   border-width: 0 0 0 1px;
   vertical-align: top;
   cursor: e-resize;
-  transition: width       500ms ease-in,
-              margin-left 500ms ease-in,
-              opacity     200ms ease-in 300ms;
-  z-index: 1;
+  transition: width 500ms ease-in, opacity 200ms ease-in 300ms;
+  z-index: 2;
 }
 
 .splitter-vertical {
   width: 100%;
   height: 5px;
   display: block;
-  margin-top: -6px;
   margin-left: -5px;
   padding-right: 5px;
   border-width: 1px 0 0;
   cursor: n-resize;
-  transition: height     500ms ease-in,
-              margin-top 500ms ease-in,
-              opacity    200ms ease-in 300ms;
-  z-index: 2;
-}
-
-/* When resizing, keep the resize cursor even if
- * the mouse wanders off the splitter a little. */
-#editor.resize-x,
-#editor.resize-x * {
-  cursor: e-resize !important;
-}
-
-#editor.resize-y,
-#editor.resize-y * {
-  cursor: n-resize !important;
+  transition: height 500ms ease-in, opacity 200ms ease-in 300ms;
+  z-index: 3;
 }
 
 /* =======================================================
@@ -289,46 +237,49 @@
  * ======================================================= */
 
 .title-bar {
-  position: absolute;
-  top: -24px;
-  height: 24px;
+  display: flex;
   width: 100%;
+  height: 24px;
+  padding: 2px 0 5px;
   box-sizing: content-box;
-  background: rgb(250, 250, 250);
-  z-index: 1;
-}
-
-.title-bar .title {
-  position: absolute;
-  left: 61px; /* Link bar width + 5px. */
-  width: -webkit-calc(100% - (56px * 2) - 10px); /* 56px is the link bar width. */
-  text-overflow: ellipsis;
-  overflow: hidden;
   font-size: 17px;
   font-family: Cousine;
   line-height: 24px;
-  text-align: center;
-  vertical-align: middle;
+  background: rgb(250, 250, 250);
+  transition: padding-top ease-in 500ms;
+  z-index: 1;
+  order: -1; /* Should be at the top of the pane. */
 }
 
-/* =======================================================
- *                        Link Bar
- *
- * The link bar exists within the info bar, floated to the
- * right side. It contains buttons and icons related to
- * linking panes together, including the status light and
- * link icon.
- * ======================================================= */
+/* Add a little more padding to panes not preceded by a vertical splitter. */
+#editor > .pane:not(.vertical-splitter-pane) .title-bar,
+.vertical-splitter-pane > .pane:first-child .title-bar {
+  padding-top: 7px;
+}
 
+.title-bar .title {
+  width: 100%;
+  text-align: center;
+  vertical-align: middle;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.info-bar { order: 0; }
+.title-bar .title { order: 1; }
+.link-bar { order: 2; }
+
+.info-bar,
 .link-bar {
   height: 100%;
-  float: right;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
 }
 
+.info-bar > *,
 .link-bar > * {
-  margin-right: 10px;
+  margin: 0 10px;
   z-index: 3;
 }
 
@@ -361,53 +312,38 @@
   pointer-events: auto;
 }
 
+.pane-number {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 35px;
+  padding: 0 15px;
+  font-family: Cousine;
+  font-size: 17px;
+  line-height: 35px;
+  text-align: center;
+  color: #ccc;
+  background: rgba(250, 250, 250, 0.95);
+  transition: opacity 300ms ease;
+}
+
+#editor:not(.managing-links) .pane:focus .pane-number,
+#editor:not(.managing-links) .pane.focus .pane-number {
+  opacity: 0;
+}
+
+.managing-links .pane-number {
+  z-index: 4;
+}
+
+/* Shift it over to align with the horizontal splitter. */
+#editor > .pane:not(:first-child) .pane-number {
+  left: -5px;
+}
+
 /* =======================================================
  *               Panes - Opening and Closing 
- *
- * When panes are opened and closed, they are animated.
- * Styles relating to this are listed below.
- *
- * It's in this part that all the hacky techniques from
- * the other sections really stand out -- for smooth
- * transitions to be really possible, all the odd borders
- * and offsets need to be transitioned as well, and you
- * can see that here.
  * ======================================================= */
-
-.splitter-horizontal {
-  transition: width       500ms ease-in,
-              margin-left 500ms ease-in,
-              opacity     200ms ease-in 300ms;
-}
-
-.splitter-vertical {
-  transition: height     500ms ease-in,
-              margin-top 500ms ease-in,
-              opacity    200ms ease-in 300ms;
-}
-
-#editor > .pane {
-  transition: width              500ms cubic-bezier(0.3, 0.4, 0.3, 1),
-              opacity            300ms ease-in,
-              border-right-width 300ms ease-in;
-}
-
-.vertical-splitter-pane > .pane {
-  transition: height              500ms cubic-bezier(0.3, 0.4, 0.3, 1),
-              opacity             300ms ease-in,
-              border-top-width    300ms ease-in,
-              border-bottom-width 300ms ease-in;
-}
-
-/* Fixes a bug where the command bar is initially positioned
- * wrong on a pane above a closing pane, inside a vertical split. */
-.vertical-splitter-pane > .pane.above-closing {
-  border-bottom: 0;
-}
-
-.title-bar {
-  transition: top 300ms ease-in;
-}
 
 .pane.closing {
   opacity: 0;
@@ -415,56 +351,44 @@
 
 #editor > .pane.closing {
   width: 0 !important; /* Override inline style set with js. */
-  border-right-width: 0;
-}
-
-.vertical-splitter-pane > .pane.closing:first-child + .splitter + .pane {
-  border-top-width: 29px;
 }
 
 .vertical-splitter-pane > .pane.closing {
   height: 0 !important; /* Override inline style set with js. */
-  border-top-width: 0;
-  border-bottom-width: 0;
-}
-
-.vertical-splitter-pane > .pane.closing > .title-bar {
-  top: 0;
 }
 
 .splitter-horizontal.closing {
   width: 0;
   opacity: 0;
-  margin-left: 0;
 }
 
 .splitter-vertical.closing {
   height: 0;
   opacity: 0;
-  margin-top: 0; 
 }
 
-/* For the next few rules, zero out values instantly (sans transition).
- * The correct values will be transitioned back in when the .instant-open
- * class is removed again. */
-.pane.instant-open {
+.vertical-splitter-pane .pane.closing:first-child + .splitter + .pane .title-bar {
+  padding-top: 7px;
+}
+
+/* Reset properties to their minimum values instantly. The correct
+ * values will be transitioned back in when the class is removed. */
+.pane.reset-layout {
   transition: none !important; /* Override inline style set with js. */
   opacity: 0;
 }
 
-#editor > .pane.instant-open {
+#editor > .pane.reset-layout {
   width: 0;
 }
 
-.vertical-splitter-pane > .pane.instant-open {
+.vertical-splitter-pane > .pane.reset-layout {
   height: 0;
-  border-top-width: 0;
-  border-bottom-width: 0;
 }
 
-.vertical-splitter-pane > .pane.instant-open > .title-bar {
+.vertical-splitter-pane > .pane.reset-layout > .title-bar {
   transition: none;
-  top: 0;
+  padding-top: 2px;
 }
 
 /* =======================================================
@@ -534,7 +458,9 @@
 .link-line-container :last-child {
   position: absolute;
 
-  /* An awful hack to make positioning relative to size. */
+  /* A hack to make positioning relative to size. Just change
+   * font-size to alter width/height, and it will automaticaly
+   * remain centered because of the left: -0.5em rule. */
   font-size: 26px;
   left: -0.5em;
   width: 1em;
@@ -546,10 +472,8 @@
   box-shadow: 0 0 0 2px rgb(0, 173, 255);
   background-color: rgb(0, 173, 255);
 
-  transition: width        300ms ease-in,
-              height       300ms ease-in,
-              left         300ms ease-in,
-              top          300ms ease-in,
+  transition: width        300ms ease-in, height 300ms ease-in,
+              left         300ms ease-in, top    300ms ease-in,
               border-width 300ms ease-in;
 }
 
@@ -687,10 +611,6 @@
 
 .input-area .ace_gutter {
   background: none;
-}
-
-.input-area .ace_scroller {
-  cursor: text;
 }
 
 .filetype-mkd .ace_line_group * {

@@ -813,7 +813,8 @@
 
     // Increase the z-index of the line when hovering over an end point so that
     // it's still on top of the nexus, which also gets promoted (see stylesheet).
-    if (this.hoverState.nexus) this.containers.display.style.zIndex = 3;
+    if (this.hoverState.nexus || isEndNode) this.containers.display.style.zIndex = 3;
+    else this.containers.display.style = '';
 
     // Set transition properties, and fade in the line.
     this.containers.display.style.transition = this.isShowingLink && transition
@@ -1108,6 +1109,12 @@
     // Allows third parties to store data.
     this.data = {};
 
+    // For tracking the position within the editor.
+    this.index = {
+      column: 0,
+      row: 0
+    };
+
     // Defaults.
     this.wrapper = wrapper || document.createElement('div');
     this.type    = type    || 'base';
@@ -1136,28 +1143,37 @@
     this.wrapper.appendChild(this.overlayElement);
 
     // Create titlebar elements.
-    this.titleBar     = document.createElement('div');
-    this.titleElement = document.createElement('span');
-    this.linkBar      = document.createElement('div');
-    this.linkButton   = document.createElement('div');
-    this.statusLight  = document.createElement('div');
+    this.infoBar       = document.createElement('div');
+    this.numberElement = document.createElement('span');
+    this.titleBar      = document.createElement('div');
+    this.titleElement  = document.createElement('span');
+    this.linkBar       = document.createElement('div');
+    this.linkButton    = document.createElement('div');
+    this.statusLight   = document.createElement('div');
     anchor = document.createElement('div');
 
     // Set class names.
-    this.titleBar.className     = 'title-bar';
-    this.titleElement.className = 'title';
-    this.linkBar.className      = 'link-bar';
-    this.linkButton.className   = 'link-button';
-    this.statusLight.className    = 'status-light';
+    this.infoBar.className       = 'info-bar';
+    this.numberElement.className = 'pane-number';
+    this.titleBar.className      = 'title-bar';
+    this.titleElement.className  = 'title';
+    this.linkBar.className       = 'link-bar';
+    this.linkButton.className    = 'link-button';
+    this.statusLight.className   = 'status-light';
     anchor.className = 'anchor';
 
     // Add them all to the DOM.
+    this.titleBar.appendChild(this.infoBar);
     this.titleBar.appendChild(this.titleElement);
     this.titleBar.appendChild(this.linkBar);
     this.titleBar.appendChild(anchor);
     this.linkBar.appendChild(this.linkButton);
     this.linkBar.appendChild(this.statusLight);
+    this.wrapper.appendChild(this.numberElement);
     this.wrapper.appendChild(this.titleBar);
+
+    // Make the info bar and the info bar the same width.
+    this.infoBar.style.width = getComputedStyle(this.linkBar).width;
 
     // Switch to the buffer.
     this.switchBuffer(buffer || new Buffer());
@@ -1177,26 +1193,18 @@
       _this.linkToPane(false, true);
     });
 
-    // Adds a class to the pane above this one, if this pane is a vertical splitter pane.
-    // For an explanation of this, you can reference the CSS styles for the .above-closing
-    // class within editor.css.
-    this.on('remove.start', function() {
-      if (_this.wrapper.parentElement.classList.contains('vertical-splitter-pane')) {
-        if (_this.wrapper.previousElementSibling) {
-          prevPane = _this.wrapper.previousElementSibling.previousElementSibling;
-          prevPane.classList.add('above-closing');
-        }
-      }
-    });
-
-    // Removes the class added in the above function, if needed.
-    this.on('remove.end', function() {
-      if (prevPane) prevPane.classList.remove('above-closing');
-    });
-
     // Listens for scroll events.
     this.wrapper.addEventListener('scroll', function() {
       _this.trigger('scroll');
+    });
+
+    // Keep the number element updated.
+    this.editor.on(['addPane', 'removePane', 'updatePaneIndices'], function() {
+      _this.updateNumberElement();
+    });
+
+    this.on('link', function() {
+      _this.updateNumberElement();
     });
 
     // Run any post-initialization.
@@ -1204,6 +1212,34 @@
 
     return this;
   }
+
+  /**
+   * Gets the index as a string in the form "column.row".
+   *
+   * @return {String} The stringified index.
+   */
+  Pane.prototype.getIndexAsString = function() {
+    var index = '' + this.index.column;
+    if (this.index.row) index += '.' + this.index.row;
+
+    return index;
+  };
+
+  /**
+   * Updates the number element.
+   * 
+   * The number element shows the pane's index, as well
+   * as what pane (if any) it is linked to.
+   */
+  Pane.prototype.updateNumberElement = function() {
+    var text = this.getIndexAsString();
+
+    if (this.linkedPane) {
+      text += '&thinsp;&rarr;&thinsp;' + this.linkedPane.getIndexAsString();
+    }
+
+    this.numberElement.innerHTML = text;
+  };
 
   /**
    * A method meant to be overridden by subclasses.
@@ -1287,11 +1323,11 @@
   Pane.prototype.switchBuffer = function(buffer, breakLink) {
     var _this = this;
 
-    // Break the link if requested.
-    if (breakLink && this.linkedPane) this.linkToPane(false);
-
     // Keep track of the old buffer.
     var oldBuffer = this.buffer;
+
+    // Break the link if requested.
+    if (breakLink && this.linkedPane) this.linkToPane(false);
 
     // Set the new buffer.
     this.buffer = buffer;
@@ -1512,9 +1548,9 @@
 
     // Make sure that the editor instance is refreshed upon resize,
     // without being called too often (causes animation lag.)
-    this.on('resize', _.debounce(function() {
+    this.on('resize', function() {
       _this.ace.resize();
-    }, 50));
+    });
 
     Pane.prototype.postInitialize.call(this);
   }
@@ -1567,6 +1603,7 @@
     if (typeof prefs.useSoftTabs           !== 'undefined') this.ace.setOption('useSoftTabs', prefs.useSoftTabs);
     if (typeof prefs.wrap                  !== 'undefined') this.ace.setOption('wrap', prefs.wrap);
     if (typeof prefs.wrapBehavioursEnabled !== 'undefined') this.ace.setOption('wrapBehavioursEnabled', prefs.wrapBehavioursEnabled);
+    if (typeof prefs.wrapMethod            !== 'undefined') this.ace.session.setOption('wrapMethod', prefs.wrapMethod);
 
     // String value = absolute line height.
     // Number value = line height relative to font size.
@@ -1625,22 +1662,27 @@
   InputPane.prototype.switchBuffer = function(buffer, breakLink) {
     var _this = this;
 
-    this.doc = buffer.getLink();
-    this.ace.setSession(this.doc);
-    this.ace.resize();
-
     // Remove old event listeners.
     if (this.buffer) this.buffer.off(this.filetypeChangeID);
+
+    // Call Pane.switchBuffer() and cache the result.
+    var result = Pane.prototype.switchBuffer.call(this, buffer, breakLink);
+
+    // Set the pane's contents.
+    this.doc = this.buffer.getLink();
+    this.ace.setSession(this.doc);
+    this.ace.resize();
     
     // Listen for filepath changes on the new buffer.
-    this.filetypeChangeID = buffer.on('change.filetype', function(filetype) {
+    this.filetypeChangeID = this.buffer.on('change.filetype', function(filetype) {
       _this.setMode(filetype);
     });
 
     // Set the mode.
-    this.setMode(buffer.filetype);
+    this.setMode(this.buffer.filetype);
     
-    return Pane.prototype.switchBuffer.call(this, buffer, breakLink);
+    // Return the cached result.
+    return result;
   };
 
 /* =======================================================
@@ -1799,6 +1841,8 @@
     this.linkContainer.className = 'link-line-wrapper';
     document.body.appendChild(this.linkContainer);
 
+    // Mix in event handling.
+    Observable.mixin(this);
     return this;
   }
 
@@ -1827,22 +1871,34 @@
    * @todo Contemplate whether or not to emulate vim's behaviour, in that a pane
    *       taking up approximately > 80% of the screen's width/height will be
    *       partitioned in half without effecting any other panes.
-   * @todo Create a cleaner method for passing in the arguments to the pane's
-   *       constructor.
    *
-   * @param {Function} constructor - The constructor of the pane type to add.
-   * @param {Array} args - An array of arguments, to be passed in order to the constructor.
-   * @param {String} type - The orientation of the pane. Passing 'vertical' will
-   *                        create the split vertically, while 'horizontal' splits it in
-   *                        the horizontal direction.
-   * @param {Pane} [parentPane] - A pane to add the new pane relative to.
-   * @param {Boolean} [isInstant=false] - Whether or not the addition should be instant.
+   * @param {Function}     constructor         - The constructor of the pane type to add.
+   * @param {Array}        args                - An array of arguments to be apply()'d to the constructor.
+   * @param {String}       [type='horizontal'] - The orientation of the pane. 
+   * @param {Pane}         [parentPane]        - A pane to add the new pane relative to.
+   * @param {Boolean|null} [isInstant]         - Whether or not the addition should be instant.
+   * @param {Function}     [callback]          - A callback to run after removing the pane.
    * @return {Pane} The newly added pane.
    */
-  Editor.prototype.addPane = function(constructor, args, type, parentPane, isInstant) {
+  Editor.prototype.addPane = function(constructor, args, type, parentPane, isInstant, callback) {
     var _this = this;
     var container = this.container;
     var pane, factoryFunction, wrapper, focusPane, outerWrapper;
+
+    // Animate based on set preferences.
+    if (isInstant === null || typeof isInstant === 'undefined') {
+      isInstant = !Preferences.get(prefKeys.panes + '.animateOpen');
+    }
+
+    // Get a safe default split type.
+    if (!type || (!this.panes.length && type === 'vertical')) {
+      type = 'horizontal';
+    }
+
+    // Get a default parent pane.
+    if (!parentPane && this.panes.length) {
+      parentPane = this.panes[this.panes.length - 1];
+    }
 
     // Default args to an array.
     args = [].concat(args);
@@ -1910,8 +1966,26 @@
     factoryFunction = constructor.bind.apply(constructor, args);
     pane = new factoryFunction();
 
-    // Add the pane to the pane list.
-    this.panes.push(pane);
+    // Get the correct index and insert the pane.
+    if (parentPane) {
+      pane.index.column = parentPane.index.column;
+      pane.index.row = parentPane.index.row;
+
+      if (type === 'vertical') pane.index.row++;
+      else pane.index.column++;
+
+      var insertAfter = type === 'vertical' ? parentPane
+        : this.getPaneByIndex(parentPane.index.column, -1);
+
+      this.panes.splice(this.panes.indexOf(insertAfter) + 1, 0, pane);
+      this.updatePaneIndices();
+    } else {
+      pane.index.column = 1;
+      pane.index.row = 0;
+
+      this.panes.push(pane);
+      this.updatePaneIndices();
+    }
 
     // Trigger the in-progress add event.
     pane.trigger('add.start');
@@ -1919,11 +1993,16 @@
     // Add a class.
     wrapper.classList.add('opening');
 
-    // Add the pane without a transition. 
+    // If adding the pane with a transition, zero out the pane size to avoid
+    // unsightly reflows. (For an example, comment out the lines within the first
+    // if statement and then add two horizontal splits. The second split will push
+    // the first over, then disappear, then animate in again. Doesn't look nice.)
     if (!isInstant) {
-      wrapper.classList.add('instant-open');
+      wrapper.classList.add('reset-layout');
       wrapper.offsetHeight; // Trigger reflow.
-      wrapper.classList.remove('instant-open');
+      wrapper.classList.remove('reset-layout');
+    } else {
+      wrapper.classList.add('resize-instant');
     }
 
     // Show the pane's link.
@@ -1934,26 +2013,22 @@
 
     // Size the panes appropriately.
     sizePanesEvenly(this, container, type, isInstant, null, function() {
-      // Vertical splits cause display issues.
-      if (type === 'vertical') {
-        _.forEach(_this.panes, function(pane) {
-          if (pane instanceof InputPane) {
-            pane.ace.resize();
-          }
-        });
-      }
-
       // Refocus the focus pane.
       if (focusPane && !focusPane.isFocused) focusPane.focus();
 
       // Remove the opening class.
       wrapper.classList.remove('opening');
+      if (isInstant) wrapper.classList.remove('resize-instant');
 
       // Trigger the pane's added event.
       pane.trigger('add.end');
+
+      // Trigger the callback.
+      if (callback) callback();
     });
 
     // Track which pane was most recently focused.
+    pane.data.focusOrder = 0;
     pane.on('focus', function() {
       _this.panes.forEach(function(pane) {
         pane.data.focusOrder++;
@@ -1962,7 +2037,8 @@
       pane.data.focusOrder = 0;
     });
 
-    pane.data.focusOrder = 0;
+    // Let listeners know we added a pane.
+    this.trigger('addPane', pane);
 
     return pane;
   };
@@ -1971,14 +2047,21 @@
    * Removes the specified pane.
    *
    * @param {Pane} pane - The pane to remove.
-   * @param {Function} callback - A callback to run after removing the pane.
+   * @param {Boolean|null} [isInstant] - Whether or not the addition should be instant.
+   *                                     Pass null for default.
+   * @param {Function} [callback] - A callback to run after removing the pane.
    */
-  Editor.prototype.removePane = function(pane, callback) {
+  Editor.prototype.removePane = function(pane, isInstant, callback) {
     var container        = pane.wrapper.parentElement;
     var sibling          = pane.wrapper.previousElementSibling || pane.wrapper.nextElementSibling;
     var containerParent  = container.parentElement;
     var containerSibling = container.previousElementSibling || container.nextElementSibling;
     var wrapper, splitter, parentElement, direction, newFocus, interval;
+
+    // Animate based on set preferences.
+    if (isInstant === null || typeof isInstant === 'undefined') {
+      isInstant = !Preferences.get(prefKeys.panes + '.animateClose');
+    }
 
     // A separate case is needed for vertical split panes. For example, removing
     // the last pane in a vertical split should also remove the split container.
@@ -1987,10 +2070,10 @@
       && container.classList.contains('vertical-splitter-pane')
       && containerSibling.classList.contains('splitter');
 
-    // It's the last pane, so just give it a new buffer.
+    // It's the last pane, so just give it a new buffer and return early.
     if (!shouldRemovePane && !shouldRemoveParent) {
       pane.switchBuffer(new Buffer());
-      callback();
+      if (callback) callback();
       return false;
     }
 
@@ -2025,6 +2108,7 @@
     // Transition out the panes.
     wrapper.classList.add('closing');
     splitter.classList.add('closing');
+    if (isInstant) wrapper.classList.add('resize-instant');
 
     // Trigger resize events on an interval.
     interval = setInterval(function() {
@@ -2032,7 +2116,7 @@
     }, 10);
 
     // Remove the pane and resize the remaining panes.
-    sizePanesEvenly(this, parentElement, direction, false, wrapper, function() {
+    sizePanesEvenly(this, parentElement, direction, isInstant, wrapper, function() {
       parentElement.removeChild(splitter);
       parentElement.removeChild(wrapper);
       clearInterval(interval);
@@ -2040,11 +2124,16 @@
       // Trigger the pane's removed event.
       pane.trigger('remove.end');
 
-      callback();
+      // Trigger the callback.
+      if (callback) callback();
     });
 
-    // Focus another pane.
+    // Update pane indices and focus another pane.
+    this.updatePaneIndices();
     this.focusPane();
+
+    // Let listeners know we removed a pane.
+    this.trigger('removePane');
   };
 
   /**
@@ -2334,7 +2423,6 @@
     var copy = this.panes.slice();
 
     // The currently focused pane.
-    // Exit early if found, else continue.
     var current = this.getFocusPane();
     if (current) return current;
 
@@ -2346,23 +2434,25 @@
       return pane.data.focusOrder;
     })[0];
 
+    if (recent) {
+      recent.focus();
+      return recent;
+    }
+
     // The most recently focused pane of any type.
     var fallback = copy.sort(function(pane) {
       return pane.data.focusOrder;
     })[0];
 
-    var pane = current || recent || fallback;
-    if (pane) pane.focus();
-
-    return pane;
+    fallback.focus();
+    return fallback;
   };
 
   /**
    * Returns the pane with the specified element as a wrapper.
    *
    * @param {Element} element - The wrapper element to find the pane of.
-   * @return {Pane|false} The pane with the given wrapper, or false if no
-   *                      pane has the wrapper specified.
+   * @return {Pane|false} The pane with the given wrapper, or false if not found.
    */
   Editor.prototype.getPaneByElement = function(element) {
     return _.find(this.panes, function(pane) {
@@ -2384,6 +2474,88 @@
 
     return paneElement ? this.getPaneByElement(paneElement) : false;
   };
+
+  /**
+   * Returns the pane at the given column and row.
+   *
+   * Passing negative numbers will return the nth last column/row.
+   *
+   * @param {Integer|String} column - The column of the pane, or the full index as a string.
+   * @param {Integer} row - The row of the pane.
+   * @return {Pane|false} The pane with the given index, or false if not found.
+   */
+  Editor.prototype.getPaneByIndex = function(column, row) {
+    // Parse the index from a string, using just the first argument.
+    if (typeof column === 'string') {
+      var index = column.split('.');
+      column    = parseInt(index[0], 10);
+      row       = parseInt(index[1], 10) || 0;
+    }
+
+    // Find the pane by checking for a column and row match.
+    if (column < 0) {
+      var maxColumn = this.panes[this.panes.length - 1].index.column;
+      column = maxColumn + (column + 1);
+    }
+
+    if (row < 0) {
+      var maxRow = _(this.panes).filter(function(pane) {
+        return pane.index.column === column;
+      })
+      .max(function(pane) {
+        return pane.index.row;
+      })
+      .value().index.row;
+
+      row = maxRow + (row + 1);
+    }
+
+    return _.find(this.panes, function(pane) {
+      return pane.index.column === column && pane.index.row === row;
+    }) || false;
+  };
+
+  /**
+   * Makes sure that the pane indices follow each other, i.e. 1.1 follows
+   * 1.0, and not another 1.1 because of how they're added.
+   * 
+   * Pane indices increase by 1 for every column, and by .1 for every row. This
+   * means that the pane in the 3rd column and 5th row would have an index of
+   * 3.5. Note that the numbers won't roll over to each other -- it's perfectly
+   * possible to have a pane at an index of, say, 2.11, though not without
+   * changing the maximum row count in the editor's preferences.
+   */
+  Editor.prototype.updatePaneIndices = function() {
+    if (!this.panes.length) return;
+
+    // Start with the first pane: index 1.0.
+    var last = this.panes[0];
+    var lastWrapper = last.getOuterWrapper();
+    last.index.column = 1;
+    last.index.row = 0;
+    last.numberElement.textContent = 1;
+
+    // Increase index by 1 for every column, and by .1 for every row.
+    for (var i = 1; i < this.panes.length; i++) {
+      var current = this.panes[i];
+      var currentWrapper = current.getOuterWrapper();
+
+      if (currentWrapper === lastWrapper && currentWrapper !== this.container) {
+        current.index.column = last.index.column;
+        current.index.row = last.index.row + 1;
+      } else {
+        current.index.column = last.index.column + 1;
+        current.index.row = 0;
+      }
+
+      last = current;
+      lastWrapper = currentWrapper;
+    }
+
+    // Notify listeners.
+    this.trigger('updatePaneIndices');
+  }
+
 
   /**
    * Divides up the space evenly among panes in the given direction.
@@ -2437,15 +2609,20 @@
       });
     }
 
-    if (isInstant) {
+    // Finshes off the resize.
+    function finish() {
       triggerResize();
 
       for (var i = 0; i < children.length; i += 2) {
         children[i].classList.remove('resizing');
       }
 
-      if (typeof callback === 'function') callback();
+      if (callback) callback();
+    }
 
+    // If instant, finish without waiting for a transition.
+    if (isInstant) {
+      finish();
       return;
     }
 
@@ -2456,15 +2633,7 @@
     child.addEventListener('transitionend', function listen(event) {
       if (event.propertyName === property) {
         clearInterval(interval);
-
-        triggerResize();
-
-        for (var i = 0; i < children.length; i += 2) {
-          children[i].classList.remove('resizing');
-        }
-
-        if (typeof callback === 'function') callback();
-
+        finish();
         child.removeEventListener('transitionend', listen);
       }
     });
@@ -2689,7 +2858,9 @@
 
   Preferences.set(prefKeys.panes, {
     maxHorizontal: 3,
-    maxVertical: 4
+    maxVertical: 4,
+    animateOpen: true,
+    animateClose: true
   });
 
   Preferences.set(prefKeys.defaultFiletype, {
@@ -2723,7 +2894,8 @@
       tabSize:               4,
       useSoftTabs:           true,
       wrap:                  true, /* (true|'free') | (false|'off') | (-1|'printMargin') | (Integer) */
-      wrapBehavioursEnabled: true
+      wrapBehavioursEnabled: true,
+      wrapMethod:            'auto' /* 'code'|'text'|'auto' */
     },
     preview: {
       mode: 'plain_text'

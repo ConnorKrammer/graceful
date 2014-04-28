@@ -19,20 +19,14 @@
     argCount: 1,
     func: function(arg) {
       var pane = graceful.editor.focusPane();
-      var paneNumber = parseInt(arg, 10);
-      var targetPane, deferred, result;
+      var targetPane = graceful.editor.getPaneByIndex(arg);
+      var deferred, result;
 
       if (arg === 'break' && pane.linkedPane) {
         result = pane.linkToPane(false);
         if (!result) return;
       }
-      else if (!isNaN(paneNumber)) {
-        if (paneNumber < 0 || paneNumber >= graceful.editor.panes.length) {
-          throw new Error('Invalid pane number "' + paneNumber + '" specified.');
-        }
-
-        targetPane = graceful.editor.panes[paneNumber];
-
+      else if (targetPane) {
         if (targetPane === pane.linkedPane || (targetPane === pane && !pane.linkedPane)) {
           return;
         }
@@ -45,7 +39,7 @@
         }
       }
       else {
-        return;
+        throw new Error('Invalid pane index "' + arg + '" specified.');
       }
 
       if (!pane.linkManager.isShowingLink) return;
@@ -71,16 +65,16 @@
    */
   CommandManager.defineCommand({
     name: 'focus',
-    template: '{paneNumber:number}',
+    template: '{index:string}',
     argCount: 1,
-    func: function(paneNumber) {
-      paneNumber = paneNumber || 0;
+    func: function(index) {
+      var pane = graceful.editor.getPaneByIndex(index);
 
-      if (paneNumber < 0 || paneNumber >= graceful.editor.panes.length) {
-        throw new Error("Invalid pane number '" + paneNumber + "' specified.");
+      if (!pane) {
+        throw new Error("Invalid pane index '" + index + "' specified.");
       }
 
-      graceful.editor.panes[paneNumber].focus();
+      pane.focus();
     }
   });
 
@@ -106,22 +100,15 @@
 
     // Add the pane.
     var deferred = Q.defer();
-    var newPane  = graceful.editor.addPane(type, new Editor.Buffer(), direction, pane);
-    var property = direction === 'vertical' ? 'height' : 'width';
+    var newPane  = graceful.editor.addPane(type, new Editor.Buffer(), direction, pane, null, function() {
+      deferred.resolve();
+    });
 
     // If no pane was added, just return.
     if (!newPane) return;
 
     // Link the pane.
     if (link) newPane.linkToPane(pane);
-
-    // Allow the transition to finish before subsequent commands can start.
-    newPane.wrapper.addEventListener('transitionend', function listener(event) {
-      if (event.propertyName === property) {
-        deferred.resolve();
-        newPane.wrapper.removeEventListener('transitionend', listener);
-      }
-    });
 
     return deferred.promise;
   }
@@ -223,13 +210,17 @@
     }
   });
 
-  function removePane(pane) {
-  }
-
   /**
-   * Closes the specified panes, or the focused pane if none are specified.
+   * Closes panes based upon the following rules:
    *
-   * @param {Integer[]|String} panes - The indices of the panes to remove, or the keyword 'all'.
+   * 1) If no panes are specified, close the focused pane.
+   * 2) If the keywords 'all but' are used, close all panes but
+   *    those specified. If no panes are specified, close all but
+   *    the focused one.
+   * 3) If the keyword 'all' is used, close all panes.
+   * 4) Otherwise, close the specified panes.
+   *
+   * @param {Integer[]|String} panes - The indices of the panes to remove, or a keyword.
    * @return {Q.Promise} A promise that the panes have finished being removed.
    */
   CommandManager.defineCommand({
@@ -237,43 +228,47 @@
     template: '{...panes?:string}',
     argCount: 1,
     func: function(panes) {
-      var promise = Q();
-      var editor = graceful.editor;
-      var focusedIndex = editor.panes.indexOf(editor.focusPane());
+      var promise    = Q();
+      var editor     = graceful.editor;
+      var focusPane  = editor.focusPane();
 
-      // 1) If no panes are specified, close the focused one.
-      // 2) If the keyword 'all' is used, close all panes but the focused pane.
-      // 3) Otherwise, close the specified panes.
-      if (!panes.length) {
-        panes.push(focusedIndex);
+      if (panes.indexOf('this') !== -1) {
+        panes.push(focusPane.getIndexAsString());
       }
-      else if (typeof panes[0] === 'string' && panes[0].toLowerCase() === 'all') {
-        for (var i = 0; i < editor.panes.length; i++) {
-          if (i !== focusedIndex) panes.push(i);
-        }
+
+      if (!panes.length) {
+        panes.push(focusPane);
+      }
+      else if (panes[0] && panes[1] && (panes[0] + ' ' + panes[1]).toLowerCase() === 'all but') {
+        var keepFocus = !panes[2];
+
+        panes = editor.panes.filter(function(pane) {
+          if (keepFocus && pane === focusPane) return false;
+          return panes.indexOf(pane.getIndexAsString()) === -1;
+        });
+      }
+      else if (panes[0] && panes[0].toLowerCase() === 'all') {
+        panes = editor.panes.filter(function(pane) {
+          return pane !== focusPane;
+        });
+
+        // Close the focused pane last.
+        panes.push(focusPane);
       }
       else {
-        panes = panes.map(function(paneNumber) {
-          return parseInt(paneNumber, 10);
-        }).filter(function(paneNumber) {
-          return !isNaN(paneNumber);
+        panes = editor.panes.filter(function(pane) {
+          return panes.indexOf(pane.getIndexAsString()) !== -1;
         });
       }
 
-      panes.map(function(pane) {
-        return graceful.editor.panes[pane];
-      })
-      .filter(function(pane) {
-        return pane;
-      })
-      .forEach(function(pane) {
+      panes.forEach(function(pane) {
         promise = Q.when(promise, function() {
           var deferred = Q.defer();
 
           if (graceful.editor.panes.indexOf(pane) === -1) {
             deferred.resolve();
           } else {
-            graceful.editor.removePane(pane, function() {
+            graceful.editor.removePane(pane, null, function() {
               deferred.resolve();
             });
           }
@@ -402,6 +397,7 @@
                 return FileSystem.readFile(selection)
                   .then(function(contents) {
                     buffer = bufferList.find(selection) || new Editor.Buffer(contents, selection);
+                    console.log(contents);
                     pane.switchBuffer(buffer, true);
                   });
               });
@@ -512,7 +508,6 @@
     var cursorElement   = ace.renderer.$cursorLayer.cursor;
     var cursorPosition  = cursorElement.getBoundingClientRect();
     var panePosition    = pane.wrapper.getBoundingClientRect();
-    var inputPosition   = pane.inputWrapper.getBoundingClientRect();
     var cursorThickness = parseInt(getComputedStyle(cursorElement).borderLeftWidth, 10);
     var offsetLeft      = (cursorThickness || cursorPosition.width) / 2;
     var offsetTop       = cursorPosition.height / 2;
@@ -525,7 +520,7 @@
     // inputPosition.top is used in the second calculation instead of panePosition.top
     // because panePosition.top ignores the interior border that offsets its contents.
     pingElement.style.left = (cursorPosition.left - panePosition.left + offsetLeft) + 'px';
-    pingElement.style.top  = (cursorPosition.top  - inputPosition.top + offsetTop)  + 'px';
+    pingElement.style.top  = (cursorPosition.top  - panePosition.top + offsetTop)  + 'px';
 
     // Add it to the DOM.
     pane.wrapper.appendChild(pingElement);
