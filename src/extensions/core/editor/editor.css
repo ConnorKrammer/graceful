@@ -609,9 +609,8 @@
  * Styles Ace editor components and syntax highlighting.
  * ======================================================= */
 
-.input-area.centered-cursors .ace_cursor {
-  height: 1.4em !important; /* Overrides the style set by JS. */
-  margin-top: -0.2em;
+.ace_gutter-cell {
+  line-height: inherit;
 }
 
 .input-area .ace_gutter {

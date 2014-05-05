@@ -1619,9 +1619,9 @@
       // Set the line height.
       this.ace.renderer.lineHeight = lineHeight;
 
-      // Styles the cursor differently if the line height is
-      // larger than the font size by 20% or more.
-      this.inputWrapper.classList.toggle('centered-cursors', lineHeight / fontSize > 1.2);
+      // Keep text centered on the line.
+      this.ace.renderer.$textLayer.element.style.setProperty('line-height', lineHeight + 'px', '!important');
+      this.ace.renderer.$gutterLayer.element.style.lineHeight = lineHeight + 'px';
     }
 
     // Resize the editor in case the style was changed.
