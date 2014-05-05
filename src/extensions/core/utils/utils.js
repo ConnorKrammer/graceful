@@ -21,6 +21,16 @@
   function Utils() {}
 
   /**
+   * Controls whether debugging tools will print to the console.
+   */
+  Utils.DEBUG_ON = true;
+
+  /**
+   * Controls the verbosity of debugging tools.
+   */
+  Utils.DEBUG_VERBOSE = false;
+
+  /**
    * Maps appshell errors codes to more descriptive error messages.
    *
    * @param {Integer} errorCode - The error code returned.
@@ -78,16 +88,6 @@
         return 'Invalid error code given.';
     }
   }
-
-  /**
-   * Controls whether debugging tools will print to the console.
-   */
-  Utils.DEBUG_ON = true;
-
-  /**
-   * Controls the verbosity of debugging tools.
-   */
-  Utils.DEBUG_VERBOSE = false;
 
   /**
    * Outputs an error message to the console, with the given
