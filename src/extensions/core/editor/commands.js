@@ -284,72 +284,10 @@
   });
 
   /**
-   * Returns a new path absolute to the current path's directory.
-   *
-   * Examples:
-   *
-   *   getAbsolutePath('C:/dir/file.txt', './new.txt')         -> 'C:/dir/new.txt'
-   *   getAbsolutePath('C:/dir/file.txt', '../new.txt')        -> 'C:/new.txt'
-   *   getAbsolutePath('C:/dir/file.txt', 'new.txt')           -> false
-   *   getAbsolutePath('C:/dir/file.txt', './newDir/new.txt')  -> 'C:/dir/newDir/new.txt'
-   *   getAbsolutePath('C:/dir/file.txt', '../newDir/new.txt') -> 'C:/newDir/new.txt'
-   *   getAbsolutePath('C:/dir/file.txt', 'newDir/new.txt')    -> false
-   *
-   * Note that the current path is assumed to be an absolute path itself, but
-   * is not checked to actually be one.
-   *
-   * @param {String} currentPath - The current path.
-   * @param {String} path - The relative path.
-   * @param {Boolean} [fallback=false] - Whether to return the current path's
-   *                  directory if the path argument is invalid.
-   * @return {String|false} The new, absolute path, or false if not possible.
-   */
-  function getAbsolutePath(currentPath, path, fallback) {
-    var firstThreeChars, firstTwoChars, index;
-
-    // Exit early if there is no current path.
-    if (!currentPath) return false;
-
-    // Either exit early or use the fallback.
-    if (!path && !fallback) return false;
-    else if (!path) path = './';
-
-    firstThreeChars = path.substr(0, 3);
-    firstTwoChars   = path.substr(0, 2);
-
-    // If the path isn't relative, return false.
-    if (firstThreeChars !== '../'
-     && firstThreeChars !== '..\\'
-     && firstTwoChars   !== './'
-     && firstTwoChars   !== '.\\') {
-      if (!fallback) return false;
-      path = firstThreeChars = firstTwoChars = './';
-    }
-
-    // Prepend './' to paths starting with parent folder references.
-    if (firstThreeChars === '../' || firstThreeChars === '..\\') {
-      path = './' + path;
-      firstTwoChars = './';
-    }
-
-    // Replace './' or '.\' with the current filepath directory.
-    if (firstTwoChars === './' || firstTwoChars === '.\\') {
-      index = Math.max(currentPath.lastIndexOf('/'), currentPath.lastIndexOf('\\')) + 1;
-      path = currentPath.substr(0, index) + path.substr(2);
-    }
-
-    return path;
-  }
-
-  /**
    * Opens a file into the given pane.
    *
    * When calling this command on a pane that is linked to another pane,
    * the link will be broken. This is due to the one-way nature of the link.
-   *
-   * @todo Currently this only works with relative filepaths.
-   *       When the python API is implemented it will allow a simple method
-   *       of checking for absolute filepaths.
    *
    * @param {String} path - The path to open. If not specified,
    *                 the user will be prompted to choose a destination. If
@@ -363,11 +301,19 @@
     argCount: 1,
     func: function(path) {
       var pane = graceful.editor.focusPane();
+
+      if (!pane) throw new Error('Cannot open file: no pane focused');
+
+      var buffer = pane.buffer;
       var bufferList = pane.editor.bufferList;
-      var buffer;
 
       // Resolve relative filepaths.
-      path = getAbsolutePath(pane.buffer.filepath, path, true) || '';
+      var bufferPath = buffer.filepath.slice(0, buffer.filepath.lastIndexOf('/'));
+      path = FileSystem.makeAbsolutePath(bufferPath, path) || '';
+
+      if (buffer.filepath && !path) {
+        path = buffer.filepath.slice(0, buffer.filepath.lastIndexOf('/'));
+      }
 
       return FileSystem.pathType(path)
         .then(function(type) {
@@ -381,39 +327,44 @@
           }
           else if (type === 'directory') {
             // If it's an existing directory, start the open dialogue there.
-            return FileSystem.showOpenDialog(null, path)
+            return FileSystem.showOpenDialog(path)
               .then(function(selection) {
                 return FileSystem.readFile(selection)
                   .then(function(contents) {
                     buffer = bufferList.find(selection) || new Editor.Buffer(contents, selection);
                     pane.switchBuffer(buffer, true);
-                });
+                  });
               });
           }
-          else if (!type || !path) {
+          else if (!type) {
             // If there is no path, start the open dialogue at the last used location.
-            return FileSystem.showOpenDialog()
-              .then(function(selection) {
-                return FileSystem.readFile(selection)
-                  .then(function(contents) {
-                    buffer = bufferList.find(selection) || new Editor.Buffer(contents, selection);
-                    console.log(contents);
-                    pane.switchBuffer(buffer, true);
+            return FileSystem.getRealPathComponent(path)
+              .then(function(realComponent) {
+                return FileSystem.showOpenDialog(realComponent || null)
+                  .then(function(selection) {
+                    return FileSystem.readFile(selection)
+                      .then(function(contents) {
+                        buffer = bufferList.find(selection) || new Editor.Buffer(contents, selection);
+                        pane.switchBuffer(buffer, true);
+                      });
                   });
               });
           }
         });
     }
   });
-
+  
   /**
    * Saves the content of the given pane.
    *
-   * @todo Currently this only works with relative filepaths.
-   *       When the python API is implemented it will allow a simple method
-   *       of checking for absolute filepaths.
-   * @todo When recursively creating a new directory, only the end directory
-   *       is deleted again when cancelling. All created directories should be.
+   * @todo (Bugfix) To reproduce on Windows:
+   *       1) Open the save dialog with arguments that
+   *          will create a new directory.
+   *       2) Navigate above a section of the newly created path.
+   *       3) Delete that directory from within the dialog.
+   *       4) Click save. You should get a message saying that
+   *          the location is unavailable. Revisting the directory
+   *          without closing the dialog fixes the problem.
    *
    * @param {String} path - The path to save to. If not specified,
    *                 the user will be prompted to choose a destination. If
@@ -423,73 +374,167 @@
    */
   CommandManager.defineCommand({
     name: 'save',
-    template: '{path?:string}',
-    argCount: 1,
-    func: function(path) {
-      var pane = graceful.editor.focusPane();
+    template: '{keyword?:string} {path?:string}',
+    argCount: 2,
+    func: function(keyword, path) {
+      var pane = graceful.editor.getFocusPane();
+
+      if (!pane) throw new Error('Cannot save file: no pane focused');
+
       var buffer = pane.buffer;
-      var lastChar;
+      var saveAsNewFile = false;
+
+      if (keyword && keyword.toLowerCase() === 'as') {
+        saveAsNewFile = true;
+      }
+      else if (keyword && !path) {
+        path = keyword;
+      }
+
+      path = path || '';
 
       // Resolve relative filepaths.
-      path     = getAbsolutePath(buffer.filepath, path) || buffer.filepath || '';
-      lastChar = path.slice(-1);
+      if (FileSystem.isAbsolute(path)) {
+        path = FileSystem.sanitizePath(path);
+      } else {
+        var bufferPath = buffer.filepath.slice(0, buffer.filepath.lastIndexOf('/'));
+        path = FileSystem.makeAbsolutePath(bufferPath, path) || buffer.filepath || '';
+      }
+
+      // Get the title specified in the path, or default to the buffer's name.
+      var title = path.slice(path.lastIndexOf('/') + 1) || buffer.title;
+
+      // Append the buffer's file extension to the path, if appropriate.
+      if (buffer.filetype) {
+        if (title.indexOf('.') === -1) title += '.';
+        if (title.slice(-1) === '.') title += buffer.filetype;
+      }
 
       return FileSystem.pathType(path)
         .then(function(type) {
-          if (type === 'file') {
-            // If it's an existing file, overwrite it.
-            return FileSystem.writeFile(path, buffer.text)
-              .then(function() {
-                buffer.setFilepath(path);
-              });
-          }
-          else if (type === 'directory') {
-            // If it's an existing directory, open the save dialogue there.
-            return FileSystem.showSaveDialogue(null, path, buffer.title)
-              .then(function(selection) {
-                return FileSystem.writeFile(selection, buffer.text)
-                  .then(function() {
-                    buffer.setFilepath(selection);
-                  });
-              });
-          }
-          else if (!type && path && (lastChar === '/' || lastChar === '\\')) {
-            // If it's an uncreated directory, create it. If the user cancels, delete it again.
-            return FileSystem.makeDirectory(path)
-              .then(function() {
-                return FileSystem.showSaveDialogue(null, path, buffer.title)
-                  .then(function(selection) {
-                    return FileSystem.writeFile(selection, buffer.text)
-                      .then(function() {
-                        buffer.setFilepath(selection);
+          return FileSystem.getRealPathComponent(path)
+            .then(function(realComponent) {
+              saveAsNewFile = saveAsNewFile
+                || (type === 'directory')
+                || (type === 'file' && path !== buffer.filepath)
+                || (!type && !path && !buffer.filepath);
+
+              // Opens a save dialog as logically close to the given location as possible.
+              function saveWithDialog() {
+                return FileSystem.pathType(realComponent)
+                  .then(function(type) {
+                    var index = realComponent.lastIndexOf('/');
+                    var openAt;
+
+                    // Get a reasonable location to open the dialog at.
+                    if (realComponentType === 'directory') openAt = realComponent;
+                    else if (realComponentType === 'file') openAt = realComponent.slice(0, index);
+                    else openAt = buffer.filepath || null;
+
+                    // Show the save dialog, and get the user's selection.
+                    return FileSystem.showSaveDialogue(openAt, title)
+                      .then(function(selection) {
+                        return FileSystem.writeFile(selection, buffer.text)
+                          .then(function() {
+                            buffer.setFilepath(selection);
+                          });
                       });
-                  })
-                  .fail(function(error) {
-                    FileSystem.unlink(path);
                   });
-              });
-          }
-          else if (!type && path) {
-            // If an uncreated file is specified, recursively create the filepath and save it.
-            return FileSystem.writeFileRecursive(path, buffer.text)
-              .then(function() {
-                buffer.setFilepath(path);
-              });
-          }
-          else if (!path && buffer.filepath) {
-            // If no path was specified but the buffer is associated with a filepath, save it there.
-            return FileSystem.writeFile(buffer.filepath, buffer.text);
-          }
-          else if (!path) {
-            // If no path is specified, open the save dialogue at the last used location.
-            return FileSystem.showSaveDialogue(null, null, buffer.title)
-              .then(function(selection) {
-                return FileSystem.writeFile(selection, buffer.text)
+              }
+
+              if (saveAsNewFile && !type && path) {
+                var directoryPath = path.slice(0, path.lastIndexOf('/') + 1);
+
+                // Create the given directory. After the dialog has closed (either
+                // by saving the file or cancelling), any created subdirectories
+                // that don't contain a file (either directly or recursively) will
+                // be deleted. For example: If "C:/this/is/a/path/" is created, but
+                // the user creates a file in "C:/this/is/" (either by directly or by
+                // using the context menu), then "C:/this/is/a/" and all its
+                // subdirectories will be deleted. Note that this *only* applies to
+                // directories created with a call to this commad. Pre-existing
+                // directories will not be deleted.
+                return FileSystem.makeDirectory(directoryPath)
                   .then(function() {
-                    buffer.setFilepath(selection);
+                    return FileSystem.showSaveDialogue(directoryPath, title)
+                      .then(function(selection) {
+                        return FileSystem.writeFile(selection, buffer.text)
+                          .then(function() {
+                            buffer.setFilepath(selection);
+                          });
+                      })
+                      .finally(function() {
+                        // In here we clean up trailing directories created by
+                        // FileSystem.makeDirectory() that were left over when
+                        // the dialog closed. Directories modified by the user
+                        // will not be removed, nor will directories that existed
+                        // before saving. "Modified" includes adding a file or
+                        // directory, not limited to the one currenly being saved.
+                        
+                        var deferred = Q.defer();
+                        var promise  = Q();
+                        var nextPath = directoryPath;
+                        var lastPath = null;
+                        var counter = 0;
+
+                        // Iterate over the created subdirectories, backwards.
+                        // Delete all trailing, unmodified folders that were created above.
+                        while (lastPath !== realComponent) {
+                          promise = Q.when(promise, function(nextPath, lastPath) {
+                            return FileSystem.directoryExists(nextPath)
+                              .then(function(exists) {
+                                if (!exists) return;
+
+                                return FileSystem.readDirectory(nextPath)
+                                  .then(function(files) {
+                                    if ((!lastPath && files.length) || (lastPath && files.length > 1)) {
+                                      deferred.resolve(lastPath);
+                                    }
+                                  });
+                              });
+                          }.bind(null, nextPath, lastPath));
+
+                          lastPath = nextPath;
+
+                          if (nextPath.slice(-1) === '/') {
+                            nextPath = nextPath.slice(0, nextPath.slice(0, -1).lastIndexOf('/') + 1);
+                          } else {
+                            nextPath = nextPath.slice(0, nextPath.lastIndexOf('/') + 1);
+                          }
+                        }
+                        
+                        // Unlink the trailing directories.
+                        return deferred.promise.then(function(path) {
+                          FileSystem.unlink(path);
+                        });
+                      });
+                  }, function() {
+                    // Open a save dialog at the specified location, or as close as possible.
+                    return saveWithDialog();
                   });
-              });
-          }
+              }
+              else if (saveAsNewFile) {
+                // Open a save dialog at the specified location, or as close as possible.
+                return saveWithDialog();
+              }
+              else if ((type === 'file' && path === buffer.filepath) || (!path && buffer.filepath)) {
+                // If it's the current file, overwrite it.
+                return FileSystem.writeFile(path, buffer.text);
+              }
+              else if (!type && path) {
+                // If an uncreated file is specified, recursively create the filepath and save it.
+                return FileSystem.writeFileRecursive(path, buffer.text)
+                  .then(function() {
+                    buffer.setFilepath(path);
+                  }, function() {
+                    // Open a save dialog at the specified location, or as close as possible.
+                    return saveWithDialog();
+                  });
+              }
+              else {
+                throw new Error('Could not save the file.');
+              }
+            });
         });
     }
   });

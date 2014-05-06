@@ -117,7 +117,7 @@
     // Set the initial filepath.
     if (!filepath) {
       this.title = this.id > 0 ? 'new_' + this.id : 'new';
-      this.filepath = null;
+      this.filepath = '';
       this.filetype = Preferences.get(prefKeys.panes + '.defaultExtension');
       this.title += this.filetype;
     } else {
@@ -165,19 +165,23 @@
     // Don't do anything if the path didn't really change.
     if (filepath === this.filepath) return;
 
+    // Sanitize the filepath.
+    filepath = FileSystem.sanitizePath(filepath);
+
     // Remember what the old filetype was.
     oldFiletype = this.filetype;
 
     // This gets the text after the last delimeter character and sets it as the title.
-    // If the string doesn't contain either '/' or '\', index will equal zero and
-    // title will equal the whole string.
-    index = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\')) + 1;
-    title = filepath.substr(index);
+    // If the string doesn't contain a slash, the title will be the whole path (since
+    // lastIndexOf() returns -1 for no match, and string.slice(index + 1) when index === -1
+    // returns the whole string).
+    index = filepath.lastIndexOf('/');
+    title = filepath.slice(index + 1);
 
     // Parse out the filetype.
     if (filepath.indexOf('.') !== -1) {
       index    = filepath.lastIndexOf('.');
-      filetype = filepath.substr(index + 1);
+      filetype = filepath.slice(index + 1);
     } else {
       filetype = 'default';
     }
