@@ -123,7 +123,7 @@
   background: rgb(250, 250, 250);
   transition: opacity 400ms ease;
   pointer-events: none;
-  z-index: 4;
+  z-index: 400;
 }
 
 .pane.opening:not(.resize-instant) .pane-overlay {
@@ -159,11 +159,11 @@
   line-height: 1.6;
   white-space: normal;
   background: rgb(250, 250, 250);
-  z-index: 1;
+  z-index: 100;
 }
 
 .managing-links .command-bar {
-  z-index: 4;
+  z-index: 400;
 }
 
 .command-bar::before {
@@ -213,7 +213,7 @@
   vertical-align: top;
   cursor: e-resize;
   transition: width 500ms ease-in, opacity 200ms ease-in 300ms;
-  z-index: 2;
+  z-index: 200;
 }
 
 .splitter-vertical {
@@ -225,8 +225,13 @@
   border-width: 1px 0 0;
   cursor: n-resize;
   transition: height 500ms ease-in, opacity 200ms ease-in 300ms;
-  z-index: 3;
+  z-index: 300;
 }
+
+/* These have to stay above the .pane-number element, otherwise
+ * sub-pixel rendering sometimes causes it to cover up the border. */
+.managing-links .splitter-horizontal { z-index: 500; }
+.managing-links .splitter-vertical   { z-index: 600; }
 
 /* =======================================================
  *                        Title Bar
@@ -247,7 +252,7 @@
   line-height: 24px;
   background: rgb(250, 250, 250);
   transition: padding-top ease-in 500ms;
-  z-index: 1;
+  z-index: 100;
   order: -1; /* Should be at the top of the pane. */
 }
 
@@ -280,7 +285,7 @@
 .info-bar > *,
 .link-bar > * {
   margin: 0 5px;
-  z-index: 3;
+  z-index: 300;
 }
 
 .info-bar :first-child { margin-left: 10px; }
@@ -338,7 +343,7 @@
 }
 
 .managing-links .pane-number {
-  z-index: 4;
+  z-index: 400;
 }
 
 /* Shift it over to align with the horizontal splitter. */
@@ -435,7 +440,7 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 4;
+  z-index: 400;
 }
 
 .link-line-container {
@@ -501,7 +506,7 @@
 .link-container :last-child,
 .link-line-container .link-endpoint {
   font-size: 40px;
-  z-index: 2;
+  z-index: 200;
 }
 
 .link-line-container .link-endpoint {
@@ -536,7 +541,7 @@
               left    300ms ease-out, top    300ms ease-out,
               opacity 150ms ease-out 50ms;
   opacity: 0;
-  z-index: 1;
+  z-index: 100;
 }
 
 .link-nexus.link-endpoint {
@@ -577,7 +582,7 @@
 .ping {
   position: absolute;
   -webkit-animation: pingPlaceholder 1150ms;
-  z-index: 3;
+  z-index: 300;
 }
 
 .ping::before,

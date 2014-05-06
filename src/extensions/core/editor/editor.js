@@ -581,6 +581,8 @@
       // Set event listeners if clicking on an end node.
       if (manageEnd) {
         _this.isDisplayLinking = true;
+        _this.updateDisplayOrder();
+
         event.stopImmediatePropagation();
         document.removeEventListener('click', startManageLinks);
         document.addEventListener('click', endManageLinks);
@@ -633,6 +635,9 @@
       document.addEventListener('click', startManageLinks);
       document.removeEventListener('click', endManageLinks);
       document.removeEventListener('mousemove', followMouse);
+
+      // Restore an appropriate z-index.
+      _this.updateDisplayOrder();
     }
 
     this.pane.on('link', function(linkedPane, oldPane) {
@@ -812,11 +817,6 @@
     this.nodes.nexus.classList.toggle('link-endpoint', isEndNode);
     this.nodes.nexus.classList.toggle('visible', isLinkNexus);
 
-    // Increase the z-index of the line when hovering over an end point so that
-    // it's still on top of the nexus, which also gets promoted (see stylesheet).
-    if (this.hoverState.nexus || isEndNode) this.containers.display.style.zIndex = 3;
-    else this.containers.display.style = '';
-
     // Set transition properties, and fade in the line.
     this.containers.display.style.transition = this.isShowingLink && transition
       ? 'opacity 400ms ease, height 250ms ease-out, -webkit-transform 250ms ease-out'
@@ -852,7 +852,6 @@
     // Place the destination on a ring around the target pane's center.
     if (this.pane.linkedPane && this.pane.linkedPane.linkManager.hoverState.nexus) {
       destination = getClosestCirclePoint(origin, destination, 50);
-      this.containers.display.style.zIndex = 2;
     }
 
     // Position the nexus at the start node position.
@@ -864,6 +863,9 @@
     this.drawInfo.display.origin = origin;
     this.drawInfo.display.destination = destination;
 
+    // Update z-index.
+    this.updateDisplayOrder();
+
     // Position and size the line.
     drawLine(this.containers.display, origin, destination);
 
@@ -873,6 +875,34 @@
     // Recursively show child links.
     if (recursive && this.pane.linkedPane) {
       this.pane.linkedPane.linkManager.showLink(recursive, transition, animateEnd);
+    }
+  };
+
+  /**
+   * Updates the z-index of the display line.
+   *
+   * @todo Refactor the complicated link states into individual functions.
+   *       Each should handle only a single aspect of the overall state,
+   *       making everything easier to manage and understand.
+   */
+  LinkManager.prototype.updateDisplayOrder = function() {
+    var isEndNode = !this.pane.linkedPane;
+
+    if (this.isDisplayLinking) {
+      // Put the currenly linking pane at the very top.
+      this.containers.display.style.zIndex = 400;
+    }
+    else if (this.pane.linkedPane && this.pane.linkedPane.linkManager.hoverState.nexus) {
+      // Put the node above the linked pane's nexus, so that it can be grabbed during hover.
+      this.containers.display.style.zIndex = 200;
+    }
+    else if (this.hoverState.nexus || isEndNode) {
+      // Stay on top of nexus, which also gets promoted under these circumstances
+      // (see stylesheet for nexus rules).
+      this.containers.display.style.zIndex = 300;
+    }
+    else {
+      this.containers.display.style.zIndex = '';
     }
   };
 
