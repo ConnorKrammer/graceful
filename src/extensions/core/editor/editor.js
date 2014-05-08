@@ -451,7 +451,6 @@
     this.containers.display.appendChild(this.nodes.displayEnd);
 
     // Keep track of what elements are being hovered over.
-    // @todo: Test performance to see if throttling would be beneficial.
     document.addEventListener('mousemove', _.throttle(function(event) {
       var endRadius           = _this.nodes.displayEnd.offsetWidth / 2;
       var nexusRadius         = _this.nodes.nexus.offsetWidth / 2;
@@ -459,7 +458,6 @@
       var oldNexusState       = _this.hoverState.nexus;
       var mousePosition       = { x: mouse.x, y: mouse.y };
       var extendedHoverState;
-
 
       // Check which elements are being hovered over.
       _this.hoverState.end   = pointInCircle(_this.drawInfo.display.destination, mousePosition, endRadius);
@@ -644,6 +642,28 @@
       _this.updateDisplayOrder();
     }
 
+    this.pane.on('resize', _.throttle(function() { 
+      if (_this.isDisplayLinking) {
+        var clientRect = _this.pane.wrapper.getBoundingClientRect();
+        _this.drawInfo.display.destination = {
+          x: mouse.x,
+          y: mouse.y
+        };
+        _this.drawInfo.display.origin = {
+          x: clientRect.left + clientRect.width  / 2,
+          y: clientRect.top  + clientRect.height / 2
+        }
+        drawLine(_this.containers.display, _this.drawInfo.display.origin,
+          _this.drawInfo.display.destination);
+      } else {
+        updateDisplayedLinks(_this.pane, false);
+      }
+
+      if (_this.isLinking && !_this.isRemoving) {
+        _this.drawLinkLine(_this.drawInfo.link.destination);
+      }
+    }, 20));
+
     this.pane.on('link', function(linkedPane, oldPane) {
       if (!_this.isDisplayLinking || linkedPane) {
         updateDisplayedLinks(_this.pane, true, false);
@@ -655,33 +675,6 @@
         endManageLinks(false);
       }
     });
-
-    this.pane.on('resize', _.throttle(function() { 
-      var clientRect;
-
-      if (_this.isDisplayLinking) {
-        clientRect = _this.pane.wrapper.getBoundingClientRect();
-        _this.drawInfo.display.destination = {
-          x: mouse.x,
-          y: mouse.y
-        };
-        _this.drawInfo.display.origin = {
-          x: clientRect.left + clientRect.width  / 2,
-          y: clientRect.top  + clientRect.height / 2
-        }
-        drawLine(_this.containers.display, _this.drawInfo.display.origin,
-          _this.drawInfo.display.destination);
-      }
-      else {
-        // In drawLine, make it so that it doesn't force a reflow if the
-        // transition doesn't need toggling.
-        updateDisplayedLinks(_this.pane, false);
-      }
-
-      if (_this.isLinking && !_this.isRemoving) {
-        _this.drawLinkLine(_this.drawInfo.link.destination);
-      }
-    }, 20));
 
     this.pane.on('remove.start', function() {
       _this.isRemoving = true;
@@ -827,6 +820,26 @@
       : 'opacity 400ms ease';
     this.containers.display.style.opacity = 1;
 
+    /* TODO: Fix a bug where the following command
+     * sequence *may* cause the transition to be skipped. This
+     * appears to occur because the transition is only set to
+     * opacity (see above ternary conditional) when the link
+     * is made, but is not always reproducible through the
+     * following sequence of commands:
+     *
+     * > split_h
+     * > manage on
+     * > link 2
+     *
+     * Then:
+     *
+     * > close 2
+     * > split_h
+     * > link 2
+     *
+     * The link will (potentially) be made with no transition.
+     */
+
     // Get the light element's position.
     source = this.pane.wrapper;
     sourceClientRect = source.getBoundingClientRect();
@@ -879,34 +892,6 @@
     // Recursively show child links.
     if (recursive && this.pane.linkedPane) {
       this.pane.linkedPane.linkManager.showLink(recursive, transition, animateEnd);
-    }
-  };
-
-  /**
-   * Updates the z-index of the display line.
-   *
-   * @todo Refactor the complicated link states into individual functions.
-   *       Each should handle only a single aspect of the overall state,
-   *       making everything easier to manage and understand.
-   */
-  LinkManager.prototype.updateDisplayOrder = function() {
-    var isEndNode = !this.pane.linkedPane;
-
-    if (this.isDisplayLinking) {
-      // Put the currenly linking pane at the very top.
-      this.containers.display.style.zIndex = 400;
-    }
-    else if (this.pane.linkedPane && this.pane.linkedPane.linkManager.hoverState.nexus) {
-      // Put the node above the linked pane's nexus, so that it can be grabbed during hover.
-      this.containers.display.style.zIndex = 200;
-    }
-    else if (this.hoverState.nexus || isEndNode) {
-      // Stay on top of nexus, which also gets promoted under these circumstances
-      // (see stylesheet for nexus rules).
-      this.containers.display.style.zIndex = 300;
-    }
-    else {
-      this.containers.display.style.zIndex = '';
     }
   };
 
@@ -1028,7 +1013,7 @@
 
     // If the transformation is from zero to another position,
     // set the tranform instantaneously (fixes silly rotation issue).
-    if (line.style.height === '0px') {
+    if (getComputedStyle(line).height === '0px') {
       line.style.opacity    = getComputedStyle(line).opacity;
       line.style.transition = 'none';
       line.offsetHeight; // Trigger reflow.
@@ -1039,6 +1024,34 @@
     // Set the line height.
     line.style.height = length + 'px';
   }
+
+  /**
+   * Updates the z-index of the display line.
+   *
+   * @todo Refactor other complicated link states into individual functions.
+   *       Each should handle only a single aspect of the overall state,
+   *       making everything easier to manage and understand.
+   */
+  LinkManager.prototype.updateDisplayOrder = function() {
+    var isEndNode = !this.pane.linkedPane;
+
+    if (this.isDisplayLinking) {
+      // Put the currenly linking pane at the very top.
+      this.containers.display.style.zIndex = 400;
+    }
+    else if (this.pane.linkedPane && this.pane.linkedPane.linkManager.hoverState.nexus) {
+      // Put the node above the linked pane's nexus, so that it can be grabbed during hover.
+      this.containers.display.style.zIndex = 200;
+    }
+    else if (this.hoverState.nexus || isEndNode) {
+      // Stay on top of nexus, which also gets promoted under these circumstances
+      // (see stylesheet for nexus rules).
+      this.containers.display.style.zIndex = 300;
+    }
+    else {
+      this.containers.display.style.zIndex = '';
+    }
+  };
 
   /**
    * Updates all shown links on panes directly connected to the given pane.
