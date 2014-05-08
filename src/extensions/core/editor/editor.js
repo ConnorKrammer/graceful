@@ -376,8 +376,9 @@
    * @todo Rename event handlers to be more consistent.
    * @todo Move event handlers out of the constructor. Right now every instance gets its own
    *       copy of each handler. (Suggestions: Move to object prototype.)
-   * @todo Simplify all the logic used to determine display/link states. (Idea: Implement a state
-   *       machine to grab the start/end positions in showLink().)
+   * @todo Simplify all the logic used to determine display/link states.
+   * @todo The animations and calculations could do with a serious performance improvement. Right
+   *       now resizing the application window while any links are being displayed is laggy.
    * 
    * @constructor
    * @param {Pane} pane - The pane to attach the status light to.
@@ -642,7 +643,7 @@
       _this.updateDisplayOrder();
     }
 
-    this.pane.on('resize', _.throttle(function() { 
+    this.pane.on('resize', function() { 
       if (_this.isDisplayLinking) {
         var clientRect = _this.pane.wrapper.getBoundingClientRect();
         _this.drawInfo.display.destination = {
@@ -662,7 +663,7 @@
       if (_this.isLinking && !_this.isRemoving) {
         _this.drawLinkLine(_this.drawInfo.link.destination);
       }
-    }, 20));
+    });
 
     this.pane.on('link', function(linkedPane, oldPane) {
       if (!_this.isDisplayLinking || linkedPane) {
