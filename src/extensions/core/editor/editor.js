@@ -119,7 +119,7 @@
       this.title = this.id > 0 ? 'new_' + this.id : 'new';
       this.filepath = '';
       this.filetype = Preferences.get(prefKeys.panes + '.defaultExtension');
-      this.title += this.filetype;
+      this.title += '.' + this.filetype;
     } else {
       this.setFilepath(filepath);
     }
@@ -180,10 +180,10 @@
 
     // Parse out the filetype.
     if (filepath.indexOf('.') !== -1) {
-      index    = filepath.lastIndexOf('.');
-      filetype = filepath.slice(index + 1);
+      index    = title.lastIndexOf('.');
+      filetype = title.slice(index + 1);
     } else {
-      filetype = 'default';
+      filetype = Preferences.get(prefKeys.panes + '.defaultExtension');
     }
 
     // Set the new filepath, filetype, and title.
@@ -1604,13 +1604,14 @@
   }
 
   /**
-   * Sets the editor's mode.
+   * Sets the editor's mode based on a filetype.
+   *
+   * Filetype should be passed in as an extension, excluding the
+   * leading '.' (dot).
    *
    * @param {String} filetype - The filetype to get the mode of.
    */
   InputPane.prototype.setMode = function(filetype) {
-    if (filetype[0] === '.') filetype = filetype.slice(1);
-
     var prefKey      = prefKeys.filetypes + '.' + filetype + '.input';
     var filePrefs    = Preferences.get(prefKey);
     var defaultPrefs = Preferences.get(prefKeys.defaultFiletype + '.input');
@@ -2914,7 +2915,7 @@
     maxVertical: 4,
     animateOpen: true,
     animateClose: true,
-    defaultExtension: '.mkd'
+    defaultExtension: 'mkd'
   });
 
   Preferences.set(prefKeys.defaultFiletype, {
